@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Walkthrough — Punch List</title>
+<style>
+  :root{
+    --ink:#0F2A45;
+    --ink-soft:#3C5674;
+    --surface:#EFF3F6;
+    --card:#FCFDFE;
+    --line:#B9C7D4;
+    --line-soft:#DCE4EA;
+    --navy:#0F2A45;
+    --navy-deep:#0A1D31;
+    --cyan:#4FA8C9;
+    --flag:#C6591E;
+    --flag-bg:#FBEAE0;
+    --done:#2F7A57;
+    --done-bg:#E7F2EC;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Consolas", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{height:100%;}
+  html,body{margin:0;padding:0;background:var(--surface);font-family:var(--sans);color:var(--ink);-webkit-tap-highlight-color:transparent;}
+  body{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ---------- Header ---------- */
+  header{background:var(--navy);color:#fff;flex:0 0 auto;}
+  .head-top{display:flex;align-items:baseline;justify-content:space-between;padding:16px 20px 10px;}
+  .head-top h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.2px;}
+  .head-top .sub{font-family:var(--mono);font-size:12px;color:#9FB6CB;margin-top:3px;}
+  .overall{padding:0 20px 14px;}
+  .overall-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:#B7CADA;margin-bottom:6px;}
+  .bar-track{height:5px;background:rgba(255,255,255,.14);border-radius:3px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--cyan);border-radius:3px;transition:width .3s ease;}
+
+  nav.tabs{display:flex;background:var(--navy-deep);overflow-x:auto;}
+  nav.tabs button{flex:1 0 auto;background:none;border:none;color:#8FA6BC;font-family:var(--sans);font-size:13.5px;font-weight:600;padding:13px 14px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
+  nav.tabs button.active{color:#fff;border-bottom-color:var(--cyan);}
+  nav.tabs button .count{font-family:var(--mono);font-size:11px;color:#6C879F;margin-left:5px;}
+  nav.tabs button.active .count{color:#BFE0EE;}
+
+  /* ---------- Main ---------- */
+  main{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 14px 90px;}
+  .room{background:var(--card);border:1px solid var(--line-soft);border-radius:10px;margin-bottom:12px;position:relative;overflow:hidden;}
+  .room::before{content:"";position:absolute;top:0;left:0;width:14px;height:14px;border-top:2px solid var(--line);border-left:2px solid var(--line);}
+  .room::after{content:"";position:absolute;bottom:0;right:0;width:14px;height:14px;border-bottom:2px solid var(--line);border-right:2px solid var(--line);}
+  .room-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;gap:10px;}
+  .room-head .titles{min-width:0;}
+  .room-head h2{font-size:15.5px;margin:0;font-weight:700;}
+  .room-head .dims{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .room-head .rprog{font-family:var(--mono);font-size:12px;color:var(--ink-soft);flex-shrink:0;display:flex;align-items:center;gap:8px;}
+  .room-head .rprog .chip{background:var(--surface);border:1px solid var(--line-soft);border-radius:20px;padding:3px 9px;}
+  .room-head .rprog .chip.complete{background:var(--done-bg);color:var(--done);border-color:transparent;}
+  .chevron{width:9px;height:9px;border-right:2px solid var(--ink-soft);border-bottom:2px solid var(--ink-soft);transform:rotate(-45deg);transition:transform .2s;flex-shrink:0;}
+  .room.open .chevron{transform:rotate(45deg);}
+
+  .items{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+  .room.open .items{max-height:3000px;}
+  .item{border-top:1px solid var(--line-soft);padding:12px 16px;}
+  .item-row{display:flex;align-items:flex-start;gap:12px;}
+  .check{width:23px;height:23px;border-radius:6px;border:2px solid var(--line);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff;}
+  .check svg{width:13px;height:13px;opacity:0;stroke:#fff;stroke-width:3;fill:none;}
+  .check.checked{background:var(--done);border-color:var(--done);}
+  .check.checked svg{opacity:1;}
+  .item-text{flex:1;font-size:14.5px;line-height:1.4;padding-top:1px;}
+  .item.checked .item-text{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--line);}
+  .flagbtn{flex-shrink:0;background:none;border:1.5px solid var(--line-soft);color:var(--ink-soft);border-radius:7px;width:32px;height:32px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .flagbtn.on{background:var(--flag-bg);border-color:var(--flag);color:var(--flag);}
+  .note-wrap{margin:10px 0 0 35px;}
+  .note-wrap textarea{width:100%;border:1.5px solid var(--flag);background:var(--flag-bg);border-radius:7px;padding:8px 10px;font-family:var(--sans);font-size:13.5px;color:var(--ink);resize:vertical;min-height:44px;}
+  .note-wrap textarea::placeholder{color:#B98868;}
+  .photo-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
+  .photo-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--line-soft);flex-shrink:0;}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-remove{position:absolute;top:2px;right:2px;background:rgba(15,42,69,.75);color:#fff;border:none;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer;padding:0;}
+  .add-photo-btn{width:64px;height:64px;border:1.5px dashed var(--flag);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--flag);font-size:24px;cursor:pointer;background:#fff;flex-shrink:0;}
+  .add-photo-btn input{display:none;}
+  .photo-uploading{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-soft);text-align:center;flex-shrink:0;}
+  .item.flagged{background:var(--flag-bg);margin:0 -16px;padding:12px 16px;}
+
+  /* ---------- Punch list ---------- */
+  .punch-empty{text-align:center;color:var(--ink-soft);padding:60px 20px;font-size:14.5px;}
+  .punch-empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:6px;}
+  .punch-group{margin-bottom:18px;}
+  .punch-group h3{font-size:13px;font-family:var(--mono);color:var(--ink-soft);margin:0 0 8px 2px;}
+  .punch-item{background:var(--card);border:1px solid var(--flag);border-left-width:4px;border-radius:8px;padding:10px 13px;margin-bottom:8px;}
+  .punch-item .pt{font-size:14px;font-weight:600;margin-bottom:3px;}
+  .punch-item .pn{font-size:13.5px;color:var(--ink-soft);white-space:pre-wrap;}
+  .punch-item .pn.empty{font-style:italic;color:#C7B3A6;}
+  .copybar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--navy);display:flex;gap:10px;}
+  .copybar button{flex:1;border:none;border-radius:9px;padding:13px;font-size:14.5px;font-weight:700;font-family:var(--sans);cursor:pointer;}
+  .copybar .copy{background:var(--cyan);color:var(--navy-deep);}
+  .copybar .reset{background:rgba(255,255,255,.12);color:#fff;flex:0 0 auto;padding:13px 16px;}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+
+  .floor-empty-pad{height:6px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-top">
+    <div>
+      <h1>New Home Walkthrough</h1>
+      <div class="sub">LENNAR — FLORIDA</div>
+    </div>
+  </div>
+  <div class="overall">
+    <div class="overall-row"><span id="overallLabel">0 / 0 checked</span><span id="overallPct">0%</span></div>
+    <div class="bar-track"><div class="bar-fill" id="overallBar" style="width:0%"></div></div>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+
+<main id="main"></main>
+
+<div class="toast" id="toast">Saved</div>
+
+<script>
+/* ---------------- Storage (plain browser localStorage — works standalone in Safari) ---------------- */
+const storage = {
+  async get(key){
+    try{
+      const v = localStorage.getItem(key);
+      return v === null ? null : { value: v };
+    }catch(e){ return null; }
+  },
+  async set(key, value){
+    try{
+      localStorage.setItem(key, value);
+      return { value };
+    }catch(e){ console.error('storage set failed', e); return null; }
+  },
+  async delete(key){
+    try{ localStorage.removeItem(key); return { deleted:true }; }catch(e){ return null; }
+  }
+};
+
+/* ---------------- Data ---------------- */
+const DATA = {
+  floor1: {
+    label: "1st Floor",
+    rooms: [
+      { id:"entry", name:"Covered Entry", dims:null, items:[
+        "Front door opens, closes, and latches smoothly",
+        "Deadbolt and lock hardware work correctly",
+        "Smart Schlage lock powers on, pairs with app, and codes work",
+        "Door frame and trim are caulked, no gaps",
+        "Exterior light fixture works",
+        "Ring doorbell is installed, powered, and connects to Wi-Fi",
+        "Ring doorbell video/motion alerts work in the app"
+      ]},
+      { id:"foyer", name:"Foyer", dims:null, items:[
+        "Flooring free of cracks or chips",
+        "Walls and ceiling free of cracks or nail pops",
+        "Light fixture works",
+        "Outlets tested and functional"
+      ]},
+      { id:"kitchen", name:"Kitchen", dims:"7' 10\" x 11' 4\"", items:[
+        "All outlets tested; GFCI trips and resets",
+        "Range/cooktop burners all ignite and heat evenly",
+        "Oven heats and door seals properly",
+        "Dishwasher runs a cycle with no leaks",
+        "Garbage disposal runs, no leaks under sink",
+        "Refrigerator space is level; water line present if applicable",
+        "Sink faucet hot/cold works, no leaks under sink",
+        "Cabinets and drawers open smoothly and align",
+        "Countertop seams are tight, no chips",
+        "Flooring free of cracks or hollow-sounding tile"
+      ]},
+      { id:"dining", name:"Dining Room", dims:"9' 8\" x 11' 4\"", items:[
+        "Outlets tested and functional",
+        "Ceiling light fixture is secure and works",
+        "Window opens, closes, locks; screen intact",
+        "Flooring and walls free of defects"
+      ]},
+      { id:"family", name:"Family Room", dims:"14' 2\" x 10' 8\"", items:[
+        "Outlets tested and functional",
+        "Ceiling fan/light installed securely, no wobble",
+        "Windows operate and lock properly",
+        "Walls and ceiling free of cracks",
+        "Flooring free of defects"
+      ]},
+      { id:"bath3", name:"Bath 3", dims:null, items:[
+        "Toilet flushes properly, no rocking at base",
+        "Sink faucet hot/cold works, no leaks under sink",
+        "Tub/shower caulking is complete, no gaps",
+        "Exhaust fan runs and vents to exterior",
+        "GFCI outlet tests and resets",
+        "Mirror/medicine cabinet is secure"
+      ]},
+      { id:"bed3", name:"Bedroom 3", dims:"10' x 11' 10\"", items:[
+        "Outlets tested and functional",
+        "Closet door and shelving are secure",
+        "Window operates, locks; screen intact",
+        "Flooring free of defects",
+        "Walls and ceiling free of cracks or paint issues"
+      ]},
+      { id:"patio", name:"Patio", dims:null, items:[
+        "Slab free of major cracks",
+        "Screen enclosure intact, no tears (if applicable)",
+        "Sliding door track is smooth, locks and seals properly",
+        "Grading directs water away from the slab"
+      ]},
+      { id:"stairs1", name:"Stairs", dims:null, items:[
+        "Railing is secure with no movement",
+        "Treads are even, no squeaks or gaps",
+        "Lighting is adequate on the stairway"
+      ]}
+    ]
+  },
+  floor2: {
+    label: "2nd Floor",
+    rooms: [
+      { id:"owner", name:"Owner's Suite", dims:"12' x 10' 10\"", items:[
+        "Outlets tested and functional",
+        "Ceiling fan/light installed securely, no wobble",
+        "Windows operate, lock; screens intact",
+        "Flooring free of defects",
+        "Walls and ceiling free of cracks"
+      ]},
+      { id:"closet", name:"Walk-In Closet", dims:null, items:[
+        "Shelving and rod are secure",
+        "Light fixture works",
+        "Door operates smoothly"
+      ]},
+      { id:"ownerbath", name:"Owner's Bath", dims:null, items:[
+        "Dual sink faucets work, no leaks under sink",
+        "Toilet flushes properly, no rocking",
+        "Tub/shower caulking is complete, no gaps",
+        "Exhaust fan runs and vents to exterior",
+        "GFCI outlets test and reset",
+        "Mirror/medicine cabinet is secure"
+      ]},
+      { id:"laundry", name:"Laundry", dims:null, items:[
+        "Washer hot/cold valves present, no leaks",
+        "Dryer vent is connected with a clear path outside",
+        "Dedicated outlet/circuit present as needed",
+        "Drain pan present under washer if required"
+      ]},
+      { id:"hvac", name:"HVAC Closet", dims:null, items:[
+        "Unit is installed cleanly with no visible damage",
+        "Filter is accessible and in place",
+        "Condensate drain line is connected, no leaks",
+        "Smart thermostat powers on and communicates with the unit",
+        "Smart thermostat connects to Wi-Fi and app control works"
+      ]},
+      { id:"bed2", name:"Bedroom 2", dims:"12' x 10'", items:[
+        "Outlets tested and functional",
+        "Closet door and shelving are secure",
+        "Window operates, locks; screen intact",
+        "Flooring free of defects",
+        "Walls and ceiling free of cracks"
+      ]},
+      { id:"bath2", name:"Bath 2", dims:null, items:[
+        "Toilet flushes properly, no rocking",
+        "Tub/shower faucet works, caulking complete",
+        "Exhaust fan runs and vents to exterior",
+        "GFCI outlet tests and resets",
+        "Sink faucet works, no leaks under sink"
+      ]}
+    ]
+  },
+  general: {
+    label: "General",
+    rooms: [
+      { id:"wholehouse", name:"Whole-House & Exterior", dims:null, items:[
+        "Exterior walls/stucco free of cracks",
+        "Roofline and gutters/downspouts are in good condition",
+        "Grading slopes away from the foundation on all sides",
+        "Driveway and walkways free of major cracks",
+        "Electrical panel is labeled correctly, no exposed wiring",
+        "Water heater installed properly, no leaks, safe temp setting",
+        "All interior doors throughout latch and close without sticking",
+        "Paint and finish are consistent throughout, no missed spots",
+        "Fiber ONT/network box is installed and active",
+        "Speed test confirms internet near the promised 1.2 Gbps",
+        "Builder's written punch list received",
+        "Warranty documents provided (structural, HVAC, appliance)",
+        "Lennar \"Everything's Included\" spec sheet matches installed items"
+      ]}
+    ]
+  }
+};
+
+const FLOOR_ORDER = ["floor1","floor2","general"];
+
+/* ---------------- State ---------------- */
+// state.items[itemId] = { checked:bool, flagged:bool, note:string }
+let state = { items: {} };
+let photoCache = {};
+let uploadingIds = new Set();
+let saveTimer = null;
+let activeTab = "floor1";
+let openRooms = new Set();
+
+function itemId(roomId, idx){ return roomId + "::" + idx; }
+
+function allItemsFlat(){
+  const out = [];
+  FLOOR_ORDER.forEach(fk=>{
+    DATA[fk].rooms.forEach(r=>{
+      r.items.forEach((text, idx)=>{
+        out.push({ floorKey:fk, room:r, idx, id:itemId(r.id, idx), text });
+      });
+    });
+  });
+  return out;
+}
+
+function getEntry(id){
+  return state.items[id] || { checked:false, flagged:false, note:"" };
+}
+function setEntry(id, patch){
+  const cur = getEntry(id);
+  state.items[id] = Object.assign({}, cur, patch);
+  scheduleSave();
+}
+
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 500);
+}
+async function doSave(){
+  try{
+    await storage.set('walkthrough-state', JSON.stringify(state));
+    showToast('Saved');
+  }catch(e){
+    console.error('Save failed', e);
+  }
+}
+async function loadState(){
+  try{
+    const res = await storage.get('walkthrough-state');
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      if(parsed && parsed.items) state = parsed;
+    }
+  }catch(e){
+    // no saved state yet
+  }
+}
+
+async function loadAllPhotos(){
+  const ids = [];
+  Object.values(state.items).forEach(e=>{ if(e.photoIds) ids.push(...e.photoIds); });
+  await Promise.all(ids.map(async id=>{
+    try{
+      const r = await storage.get('photo:'+id);
+      if(r && r.value) photoCache[id] = r.value;
+    }catch(e){ /* photo missing or failed to load */ }
+  }));
+}
+
+function compressImage(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(new Error('read failed'));
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=>reject(new Error('image decode failed'));
+      img.onload = ()=>{
+        const maxDim = 900;
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width*scale);
+          height = Math.round(height*scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addPhoto(itemId, file){
+  uploadingIds.add(itemId);
+  renderAll();
+  try{
+    const dataUrl = await compressImage(file);
+    const photoId = 'p' + Date.now() + Math.random().toString(36).slice(2,8);
+    await storage.set('photo:'+photoId, dataUrl);
+    photoCache[photoId] = dataUrl;
+    const cur = getEntry(itemId);
+    const photoIds = (cur.photoIds||[]).concat(photoId);
+    setEntry(itemId, { photoIds });
+    showToast('Photo added');
+  }catch(e){
+    console.error('Photo save failed', e);
+    showToast('Could not save photo');
+  }finally{
+    uploadingIds.delete(itemId);
+    renderAll();
+  }
+}
+
+async function removePhoto(itemId, photoId){
+  const cur = getEntry(itemId);
+  const photoIds = (cur.photoIds||[]).filter(id=>id!==photoId);
+  setEntry(itemId, { photoIds });
+  delete photoCache[photoId];
+  renderAll();
+  try{ await storage.delete('photo:'+photoId); }catch(e){ /* already gone */ }
+}
+
+let toastTimer=null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 900);
+}
+
+/* ---------------- Render ---------------- */
+function roomCounts(room){
+  let done=0;
+  room.items.forEach((_,idx)=>{ if(getEntry(itemId(room.id,idx)).checked) done++; });
+  return { done, total: room.items.length };
+}
+
+function overallCounts(){
+  const flat = allItemsFlat();
+  let done=0;
+  flat.forEach(it=>{ if(getEntry(it.id).checked) done++; });
+  return { done, total: flat.length };
+}
+
+function renderTabs(){
+  const nav = document.getElementById('tabs');
+  nav.innerHTML = '';
+  const tabDefs = FLOOR_ORDER.map(fk=>({key:fk,label:DATA[fk].label})).concat([{key:'punch',label:'Punch List'}]);
+  tabDefs.forEach(td=>{
+    const btn = document.createElement('button');
+    btn.className = td.key===activeTab ? 'active':'';
+    let countHtml = '';
+    if(td.key==='punch'){
+      const n = allItemsFlat().filter(it=>getEntry(it.id).flagged).length;
+      countHtml = `<span class="count">${n}</span>`;
+    } else {
+      let done=0, total=0;
+      DATA[td.key].rooms.forEach(r=>{ const c=roomCounts(r); done+=c.done; total+=c.total; });
+      countHtml = `<span class="count">${done}/${total}</span>`;
+    }
+    btn.innerHTML = td.label + countHtml;
+    btn.onclick = ()=>{ activeTab = td.key; renderAll(); };
+    nav.appendChild(btn);
+  });
+}
+
+function renderOverall(){
+  const {done,total} = overallCounts();
+  const pct = total? Math.round(done/total*100) : 0;
+  document.getElementById('overallLabel').textContent = `${done} / ${total} checked`;
+  document.getElementById('overallPct').textContent = pct + '%';
+  document.getElementById('overallBar').style.width = pct + '%';
+}
+
+function itemRowHtml(room, idx, text){
+  const id = itemId(room.id, idx);
+  const e = getEntry(id);
+  return `
+  <div class="item ${e.checked?'checked':''} ${e.flagged?'flagged':''}" data-id="${id}">
+    <div class="item-row">
+      <div class="check ${e.checked?'checked':''}" data-action="check" data-id="${id}">
+        <svg viewBox="0 0 24 24"><polyline points="4,13 9,18 20,6"/></svg>
+      </div>
+      <div class="item-text">${text}</div>
+      <button class="flagbtn ${e.flagged?'on':''}" data-action="flag" data-id="${id}" aria-label="Flag issue">&#9873;</button>
+    </div>
+    ${e.flagged ? `<div class="note-wrap">
+      <textarea data-action="note" data-id="${id}" placeholder="Describe the issue...">${e.note||''}</textarea>
+      <div class="photo-row">
+        ${(e.photoIds||[]).map(pid => photoCache[pid] ? `
+          <div class="photo-thumb">
+            <img src="${photoCache[pid]}">
+            <button class="photo-remove" data-action="removephoto" data-id="${id}" data-pid="${pid}">&times;</button>
+          </div>` : `<div class="photo-uploading">loading</div>`).join('')}
+        ${uploadingIds.has(id) ? `<div class="photo-uploading">saving&hellip;</div>` : `
+        <label class="add-photo-btn">+
+          <input type="file" accept="image/*" capture="environment" data-action="photoInput" data-id="${id}">
+        </label>`}
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+
+function roomHtml(room){
+  const {done,total} = roomCounts(room);
+  const complete = total>0 && done===total;
+  const open = openRooms.has(room.id);
+  return `
+  <div class="room ${open?'open':''}" data-room="${room.id}">
+    <div class="room-head" data-action="toggleRoom" data-room="${room.id}">
+      <div class="titles">
+        <h2>${room.name}</h2>
+        ${room.dims ? `<div class="dims">${room.dims}</div>` : ''}
+      </div>
+      <div class="rprog">
+        <span class="chip ${complete?'complete':''}">${done}/${total}</span>
+        <span class="chevron"></span>
+      </div>
+    </div>
+    <div class="items">
+      ${room.items.map((text,idx)=>itemRowHtml(room, idx, text)).join('')}
+    </div>
+  </div>`;
+}
+
+function renderFloor(fk){
+  const main = document.getElementById('main');
+  main.innerHTML = DATA[fk].rooms.map(roomHtml).join('') + '<div class="floor-empty-pad"></div>';
+}
+
+function renderPunch(){
+  const main = document.getElementById('main');
+  const flagged = allItemsFlat().filter(it=>getEntry(it.id).flagged);
+  if(flagged.length===0){
+    main.innerHTML = `<div class="punch-empty"><b>No issues flagged yet</b>Tap the flag icon next to any item while walking through to add it here.</div>`;
+    return;
+  }
+  const byRoom = {};
+  flagged.forEach(it=>{
+    const key = it.room.name;
+    if(!byRoom[key]) byRoom[key]=[];
+    byRoom[key].push(it);
+  });
+  let html = '';
+  Object.keys(byRoom).forEach(roomName=>{
+    html += `<div class="punch-group"><h3>${roomName}</h3>`;
+    byRoom[roomName].forEach(it=>{
+      const e = getEntry(it.id);
+      const photos = (e.photoIds||[]).filter(pid=>photoCache[pid]);
+      html += `<div class="punch-item">
+        <div class="pt">${it.text}</div>
+        <div class="pn ${e.note?'':'empty'}">${e.note ? e.note : 'No note added'}</div>
+        ${photos.length ? `<div class="photo-row">${photos.map(pid=>`<div class="photo-thumb"><img src="${photoCache[pid]}"></div>`).join('')}</div>` : ''}
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  html += `
+  <div class="copybar-spacer" style="height:6px"></div>`;
+  main.innerHTML = html;
+}
+
+function renderCopyBar(){
+  let bar = document.getElementById('copybar');
+  if(activeTab==='punch'){
+    if(!bar){
+      bar = document.createElement('div');
+      bar.className = 'copybar';
+      bar.id = 'copybar';
+      bar.innerHTML = `<button class="copy" id="copyBtn">Copy punch list</button><button class="reset" id="resetBtn">Reset all</button>`;
+      document.body.appendChild(bar);
+      document.getElementById('copyBtn').onclick = copyPunchList;
+      document.getElementById('resetBtn').onclick = resetAll;
+    }
+  } else if(bar){
+    bar.remove();
+  }
+}
+
+function copyPunchList(){
+  const flagged = allItemsFlat().filter(it=>getEntry(it.id).flagged);
+  if(flagged.length===0) return;
+  let text = "New Home Walkthrough — Punch List\n\n";
+  const byRoom = {};
+  flagged.forEach(it=>{
+    if(!byRoom[it.room.name]) byRoom[it.room.name]=[];
+    byRoom[it.room.name].push(it);
+  });
+  Object.keys(byRoom).forEach(roomName=>{
+    text += roomName + "\n";
+    byRoom[roomName].forEach(it=>{
+      const e = getEntry(it.id);
+      const photoCount = (e.photoIds||[]).length;
+      text += `  - ${it.text}${e.note ? ' — ' + e.note : ''}${photoCount ? ` [${photoCount} photo${photoCount>1?'s':''} attached — see app]` : ''}\n`;
+    });
+    text += "\n";
+  });
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard')).catch(()=>showToast('Could not copy'));
+  }
+}
+
+function resetAll(){
+  if(!confirm('Clear all checkmarks, flags, and notes?')) return;
+  state = { items: {} };
+  scheduleSave();
+  renderAll();
+}
+
+function renderAll(){
+  renderTabs();
+  renderOverall();
+  if(activeTab==='punch'){
+    renderPunch();
+  } else {
+    renderFloor(activeTab);
+  }
+  renderCopyBar();
+}
+
+/* ---------------- Events ---------------- */
+document.addEventListener('click', (ev)=>{
+  const t = ev.target.closest('[data-action]');
+  if(!t) return;
+  const action = t.dataset.action;
+  if(action==='toggleRoom'){
+    const rid = t.dataset.room;
+    if(openRooms.has(rid)) openRooms.delete(rid); else openRooms.add(rid);
+    renderAll();
+  } else if(action==='check'){
+    const id = t.dataset.id;
+    const cur = getEntry(id);
+    setEntry(id, { checked: !cur.checked });
+    renderAll();
+  } else if(action==='flag'){
+    const id = t.dataset.id;
+    const cur = getEntry(id);
+    setEntry(id, { flagged: !cur.flagged });
+    renderAll();
+  } else if(action==='removephoto'){
+    removePhoto(t.dataset.id, t.dataset.pid);
+  }
+});
+
+document.addEventListener('change', (ev)=>{
+  const t = ev.target.closest('[data-action="photoInput"]');
+  if(!t || !t.files || !t.files[0]) return;
+  addPhoto(t.dataset.id, t.files[0]);
+  t.value = '';
+});
+
+document.addEventListener('input', (ev)=>{
+  const t = ev.target.closest('[data-action="note"]');
+  if(!t) return;
+  setEntry(t.dataset.id, { note: t.value });
+});
+
+/* ---------------- Init ---------------- */
+(async function init(){
+  try{
+    await loadState();
+    await loadAllPhotos();
+    if(DATA.floor1.rooms.length) openRooms.add(DATA.floor1.rooms[0].id);
+    renderAll();
+  }catch(e){
+    console.error('Init failed', e);
+    document.getElementById('main').innerHTML =
+      '<div class="punch-empty"><b>Something went wrong loading the checklist</b>' +
+      (e && e.message ? e.message : 'Unknown error') + '</div>';
+  }
+})();
+</script>
+</body>
+</html>
