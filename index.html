@@ -550,9 +550,13 @@ function closeLightbox(){
 function openModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 
+function possessive(name){
+  return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
+
 function renderHeader(){
   document.getElementById('appTitle').textContent = appInfo.ownerName
-    ? `${appInfo.ownerName}'s New Home Walkthrough`
+    ? `${possessive(appInfo.ownerName)} New Home Walkthrough`
     : 'New Home Walkthrough';
   const subParts = [appInfo.builder, appInfo.address].filter(Boolean);
   const sub = document.getElementById('appSub');
