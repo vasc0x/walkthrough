@@ -58,6 +58,7 @@
   .status-chip{font-family:var(--mono);font-size:11px;border-radius:20px;padding:3px 9px;border:1px solid var(--line-soft);background:var(--surface);color:var(--ink-soft);flex-shrink:0;white-space:nowrap;}
   .status-chip.fixed{background:var(--done-bg);color:var(--done);border-color:transparent;}
   .status-chip.issue{background:var(--flag-bg);color:var(--flag);border-color:transparent;}
+  .archive-delete{background:none;border:1.5px solid var(--line-soft);color:var(--flag);border-radius:7px;width:28px;height:28px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .chevron{width:9px;height:9px;border-right:2px solid var(--ink-soft);border-bottom:2px solid var(--ink-soft);transform:rotate(-45deg);transition:transform .2s;flex-shrink:0;}
   .room.open .chevron{transform:rotate(45deg);}
 
@@ -696,6 +697,7 @@ function renderHistory(){
         </div>
         <div class="rprog">
           <span class="chip">${done}/${total}</span>
+          <button class="archive-delete" data-action="deleteArchive" data-archive="${a.id}" aria-label="Delete walkthrough">&#128465;</button>
           <span class="chevron"></span>
         </div>
       </div>
@@ -780,6 +782,25 @@ function saveAndStartNew(){
   renderAll();
 }
 
+async function deleteArchive(archiveId){
+  const archive = archives.find(a=>a.id===archiveId);
+  if(!archive) return;
+  if(!confirm(`Delete "${archive.label}"? This cannot be undone, including its photos.`)) return;
+  archives = archives.filter(a=>a.id!==archiveId);
+  saveArchives();
+  openArchives.delete(archiveId);
+  const photoIds = new Set();
+  Object.values(archive.items||{}).forEach(e=>{ if(e.photoIds) e.photoIds.forEach(id=>photoIds.add(id)); });
+  await Promise.all([...photoIds].map(async pid=>{
+    const url = photoCache[pid];
+    delete photoCache[pid];
+    if(url) URL.revokeObjectURL(url);
+    try{ await photoDbDelete(pid); }catch(e){ /* already gone */ }
+  }));
+  showToast('Walkthrough deleted');
+  renderAll();
+}
+
 function renderAll(){
   renderTabs();
   renderOverall();
@@ -818,6 +839,8 @@ document.addEventListener('click', (ev)=>{
     const aid = t.dataset.archive;
     if(openArchives.has(aid)) openArchives.delete(aid); else openArchives.add(aid);
     renderAll();
+  } else if(action==='deleteArchive'){
+    deleteArchive(t.dataset.archive);
   } else if(action==='resetAll'){
     ev.preventDefault();
     resetAll();
