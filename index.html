@@ -55,6 +55,9 @@
   .room-head .rprog{font-family:var(--mono);font-size:12px;color:var(--ink-soft);flex-shrink:0;display:flex;align-items:center;gap:8px;}
   .room-head .rprog .chip{background:var(--surface);border:1px solid var(--line-soft);border-radius:20px;padding:3px 9px;}
   .room-head .rprog .chip.complete{background:var(--done-bg);color:var(--done);border-color:transparent;}
+  .status-chip{font-family:var(--mono);font-size:11px;border-radius:20px;padding:3px 9px;border:1px solid var(--line-soft);background:var(--surface);color:var(--ink-soft);flex-shrink:0;white-space:nowrap;}
+  .status-chip.fixed{background:var(--done-bg);color:var(--done);border-color:transparent;}
+  .status-chip.issue{background:var(--flag-bg);color:var(--flag);border-color:transparent;}
   .chevron{width:9px;height:9px;border-right:2px solid var(--ink-soft);border-bottom:2px solid var(--ink-soft);transform:rotate(-45deg);transition:transform .2s;flex-shrink:0;}
   .room.open .chevron{transform:rotate(45deg);}
 
@@ -107,7 +110,7 @@
   <div class="head-top">
     <div>
       <h1>New Home Walkthrough</h1>
-      <div class="sub">LENNAR — FLORIDA</div>
+      <div class="sub">LENNAR — 527 NE 15TH TER, FLORIDA CITY, FL 33034</div>
     </div>
   </div>
   <div class="overall">
@@ -122,7 +125,7 @@
 <div class="toast" id="toast">Saved</div>
 
 <script>
-/* ---------------- Storage (plain browser localStorage — works standalone in Safari) ---------------- */
+/* ---------------- Storage (localStorage for checklist state/notes; both work standalone in Safari) ---------------- */
 const storage = {
   async get(key){
     try{
@@ -140,6 +143,48 @@ const storage = {
     try{ localStorage.removeItem(key); return { deleted:true }; }catch(e){ return null; }
   }
 };
+
+/* ---------------- Photo storage (IndexedDB — full-resolution blobs, no compression) ---------------- */
+const PHOTO_DB_NAME = 'walkthrough-photos';
+const PHOTO_STORE = 'photos';
+let photoDbPromise = null;
+function openPhotoDB(){
+  if(photoDbPromise) return photoDbPromise;
+  photoDbPromise = new Promise((resolve, reject)=>{
+    const req = indexedDB.open(PHOTO_DB_NAME, 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(PHOTO_STORE); };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+  return photoDbPromise;
+}
+async function photoDbSet(id, blob){
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).put(blob, id);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function photoDbGet(id){
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readonly');
+    const req = tx.objectStore(PHOTO_STORE).get(id);
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function photoDbDelete(id){
+  const db = await openPhotoDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).delete(id);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
 
 /* ---------------- Data ---------------- */
 const DATA = {
@@ -293,11 +338,13 @@ const FLOOR_ORDER = ["floor1","floor2","general"];
 /* ---------------- State ---------------- */
 // state.items[itemId] = { checked:bool, flagged:bool, note:string }
 let state = { items: {} };
+let archives = [];
 let photoCache = {};
 let uploadingIds = new Set();
 let saveTimer = null;
 let activeTab = "floor1";
 let openRooms = new Set();
+let openArchives = new Set();
 
 function itemId(roomId, idx){ return roomId + "::" + idx; }
 
@@ -346,55 +393,46 @@ async function loadState(){
   }
 }
 
-async function loadAllPhotos(){
-  const ids = [];
-  Object.values(state.items).forEach(e=>{ if(e.photoIds) ids.push(...e.photoIds); });
-  await Promise.all(ids.map(async id=>{
-    try{
-      const r = await storage.get('photo:'+id);
-      if(r && r.value) photoCache[id] = r.value;
-    }catch(e){ /* photo missing or failed to load */ }
-  }));
+function saveArchives(){
+  storage.set('walkthrough-archives', JSON.stringify(archives));
+}
+async function loadArchives(){
+  try{
+    const res = await storage.get('walkthrough-archives');
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      if(Array.isArray(parsed)) archives = parsed;
+    }
+  }catch(e){
+    // no saved archives yet
+  }
 }
 
-function compressImage(file){
-  return new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onerror = ()=>reject(new Error('read failed'));
-    reader.onload = ()=>{
-      const img = new Image();
-      img.onerror = ()=>reject(new Error('image decode failed'));
-      img.onload = ()=>{
-        const maxDim = 900;
-        let { width, height } = img;
-        if(width > maxDim || height > maxDim){
-          const scale = maxDim / Math.max(width, height);
-          width = Math.round(width*scale);
-          height = Math.round(height*scale);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+async function loadAllPhotos(){
+  const ids = new Set();
+  Object.values(state.items).forEach(e=>{ if(e.photoIds) e.photoIds.forEach(id=>ids.add(id)); });
+  archives.forEach(a=>{
+    Object.values(a.items||{}).forEach(e=>{ if(e.photoIds) e.photoIds.forEach(id=>ids.add(id)); });
   });
+  await Promise.all([...ids].map(async id=>{
+    try{
+      const blob = await photoDbGet(id);
+      if(blob) photoCache[id] = URL.createObjectURL(blob);
+    }catch(e){ /* photo missing or failed to load */ }
+  }));
 }
 
 async function addPhoto(itemId, file){
   uploadingIds.add(itemId);
   renderAll();
   try{
-    const dataUrl = await compressImage(file);
     const photoId = 'p' + Date.now() + Math.random().toString(36).slice(2,8);
-    await storage.set('photo:'+photoId, dataUrl);
-    photoCache[photoId] = dataUrl;
+    await photoDbSet(photoId, file);
+    photoCache[photoId] = URL.createObjectURL(file);
     const cur = getEntry(itemId);
     const photoIds = (cur.photoIds||[]).concat(photoId);
     setEntry(itemId, { photoIds });
-    showToast('Photo added');
+    showToast('Photo saved');
   }catch(e){
     console.error('Photo save failed', e);
     showToast('Could not save photo');
@@ -408,9 +446,11 @@ async function removePhoto(itemId, photoId){
   const cur = getEntry(itemId);
   const photoIds = (cur.photoIds||[]).filter(id=>id!==photoId);
   setEntry(itemId, { photoIds });
+  const url = photoCache[photoId];
   delete photoCache[photoId];
+  if(url) URL.revokeObjectURL(url);
   renderAll();
-  try{ await storage.delete('photo:'+photoId); }catch(e){ /* already gone */ }
+  try{ await photoDbDelete(photoId); }catch(e){ /* already gone */ }
 }
 
 let toastTimer=null;
@@ -436,10 +476,25 @@ function overallCounts(){
   return { done, total: flat.length };
 }
 
+function findRoomById(roomId){
+  for(const fk of FLOOR_ORDER){
+    const r = DATA[fk].rooms.find(rm=>rm.id===roomId);
+    if(r) return r;
+  }
+  return null;
+}
+
+function compareStatus(id){
+  const cur = getEntry(id);
+  if(cur.checked) return 'fixed';
+  if(cur.flagged) return 'open';
+  return 'pending';
+}
+
 function renderTabs(){
   const nav = document.getElementById('tabs');
   nav.innerHTML = '';
-  const tabDefs = FLOOR_ORDER.map(fk=>({key:fk,label:DATA[fk].label})).concat([{key:'punch',label:'Punch List'}]);
+  const tabDefs = FLOOR_ORDER.map(fk=>({key:fk,label:DATA[fk].label})).concat([{key:'punch',label:'Punch List'},{key:'history',label:'History'}]);
   tabDefs.forEach(td=>{
     const btn = document.createElement('button');
     btn.className = td.key===activeTab ? 'active':'';
@@ -447,6 +502,8 @@ function renderTabs(){
     if(td.key==='punch'){
       const n = allItemsFlat().filter(it=>getEntry(it.id).flagged).length;
       countHtml = `<span class="count">${n}</span>`;
+    } else if(td.key==='history'){
+      countHtml = `<span class="count">${archives.length}</span>`;
     } else {
       let done=0, total=0;
       DATA[td.key].rooms.forEach(r=>{ const c=roomCounts(r); done+=c.done; total+=c.total; });
@@ -525,8 +582,9 @@ function renderFloor(fk){
 function renderPunch(){
   const main = document.getElementById('main');
   const flagged = allItemsFlat().filter(it=>getEntry(it.id).flagged);
+  const clearLink = `<div style="text-align:center;padding:18px 20px 6px;"><a href="#" data-action="resetAll" style="color:var(--ink-soft);font-size:12.5px;text-decoration:underline;">Clear current checklist without saving</a></div>`;
   if(flagged.length===0){
-    main.innerHTML = `<div class="punch-empty"><b>No issues flagged yet</b>Tap the flag icon next to any item while walking through to add it here.</div>`;
+    main.innerHTML = `<div class="punch-empty"><b>No issues flagged yet</b>Tap the flag icon next to any item while walking through to add it here.</div>` + clearLink;
     return;
   }
   const byRoom = {};
@@ -550,8 +608,73 @@ function renderPunch(){
     html += `</div>`;
   });
   html += `
-  <div class="copybar-spacer" style="height:6px"></div>`;
+  <div class="copybar-spacer" style="height:6px"></div>` + clearLink;
   main.innerHTML = html;
+}
+
+function renderHistory(){
+  const main = document.getElementById('main');
+  if(archives.length===0){
+    main.innerHTML = `<div class="punch-empty"><b>No saved walkthroughs yet</b>When you finish a pass through the house, tap "Save &amp; New" on the Punch List tab to archive it (with full-resolution photos) and start the next one.</div>`;
+    return;
+  }
+  const html = archives.map(a=>{
+    const items = a.items || {};
+    const flaggedEntries = Object.entries(items).filter(([,e])=>e.flagged);
+    const total = Object.values(items).length;
+    const done = Object.values(items).filter(e=>e.checked).length;
+    const open = openArchives.has(a.id);
+    const dateStr = new Date(a.savedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+
+    const byRoom = {};
+    flaggedEntries.forEach(([id,e])=>{
+      const [roomId, idxStr] = id.split('::');
+      const idx = parseInt(idxStr, 10);
+      const room = findRoomById(roomId);
+      const roomName = room ? room.name : roomId;
+      if(!byRoom[roomName]) byRoom[roomName]=[];
+      byRoom[roomName].push({ id, e, text: room ? room.items[idx] : id });
+    });
+
+    let inner;
+    if(flaggedEntries.length===0){
+      inner = `<div class="item"><div class="item-text" style="font-style:italic;color:var(--ink-soft);">No issues were flagged in this walkthrough.</div></div>`;
+    } else {
+      inner = Object.keys(byRoom).map(roomName=>{
+        const rows = byRoom[roomName].map(({id,e,text})=>{
+          const status = compareStatus(id);
+          const statusHtml = status==='fixed' ? `<span class="status-chip fixed">Fixed</span>`
+            : status==='open' ? `<span class="status-chip issue">Still an issue</span>`
+            : `<span class="status-chip">Not checked yet</span>`;
+          const photos = (e.photoIds||[]).filter(pid=>photoCache[pid]);
+          return `<div class="punch-item">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+              <div class="pt">${text}</div>
+              ${statusHtml}
+            </div>
+            <div class="pn ${e.note?'':'empty'}">${e.note ? e.note : 'No note added'}</div>
+            ${photos.length ? `<div class="photo-row">${photos.map(pid=>`<div class="photo-thumb"><img src="${photoCache[pid]}"></div>`).join('')}</div>` : ''}
+          </div>`;
+        }).join('');
+        return `<div class="punch-group"><h3>${roomName}</h3>${rows}</div>`;
+      }).join('');
+    }
+
+    return `<div class="room ${open?'open':''}" data-room="${a.id}">
+      <div class="room-head" data-action="toggleArchive" data-archive="${a.id}">
+        <div class="titles">
+          <h2>${a.label}</h2>
+          <div class="dims">${dateStr} · ${flaggedEntries.length} flagged</div>
+        </div>
+        <div class="rprog">
+          <span class="chip">${done}/${total}</span>
+          <span class="chevron"></span>
+        </div>
+      </div>
+      <div class="items" style="padding:12px 16px 0;">${inner}</div>
+    </div>`;
+  }).join('');
+  main.innerHTML = html + '<div class="floor-empty-pad"></div>';
 }
 
 function renderCopyBar(){
@@ -561,10 +684,10 @@ function renderCopyBar(){
       bar = document.createElement('div');
       bar.className = 'copybar';
       bar.id = 'copybar';
-      bar.innerHTML = `<button class="copy" id="copyBtn">Copy punch list</button><button class="reset" id="resetBtn">Reset all</button>`;
+      bar.innerHTML = `<button class="copy" id="copyBtn">Copy list</button><button class="reset" id="saveNewBtn">Save &amp; New</button>`;
       document.body.appendChild(bar);
       document.getElementById('copyBtn').onclick = copyPunchList;
-      document.getElementById('resetBtn').onclick = resetAll;
+      document.getElementById('saveNewBtn').onclick = saveAndStartNew;
     }
   } else if(bar){
     bar.remove();
@@ -595,9 +718,32 @@ function copyPunchList(){
 }
 
 function resetAll(){
-  if(!confirm('Clear all checkmarks, flags, and notes?')) return;
+  if(!confirm('Clear all checkmarks, flags, and notes? This does not affect saved walkthroughs in History.')) return;
   state = { items: {} };
   scheduleSave();
+  renderAll();
+}
+
+function saveAndStartNew(){
+  const flat = allItemsFlat();
+  const total = flat.length;
+  const done = flat.filter(it=>getEntry(it.id).checked).length;
+  const flaggedCount = flat.filter(it=>getEntry(it.id).flagged).length;
+  const defaultLabel = 'Walkthrough ' + (archives.length + 1);
+  const label = prompt('Save this walkthrough as:', defaultLabel);
+  if(label===null) return;
+  if(!confirm(`Save "${label || defaultLabel}" (${done}/${total} checked, ${flaggedCount} flagged) and start a new checklist?`)) return;
+  archives.unshift({
+    id: 'a' + Date.now(),
+    label: label || defaultLabel,
+    savedAt: new Date().toISOString(),
+    items: JSON.parse(JSON.stringify(state.items))
+  });
+  saveArchives();
+  state = { items: {} };
+  scheduleSave();
+  activeTab = 'floor1';
+  showToast('Walkthrough saved');
   renderAll();
 }
 
@@ -606,6 +752,8 @@ function renderAll(){
   renderOverall();
   if(activeTab==='punch'){
     renderPunch();
+  } else if(activeTab==='history'){
+    renderHistory();
   } else {
     renderFloor(activeTab);
   }
@@ -633,6 +781,13 @@ document.addEventListener('click', (ev)=>{
     renderAll();
   } else if(action==='removephoto'){
     removePhoto(t.dataset.id, t.dataset.pid);
+  } else if(action==='toggleArchive'){
+    const aid = t.dataset.archive;
+    if(openArchives.has(aid)) openArchives.delete(aid); else openArchives.add(aid);
+    renderAll();
+  } else if(action==='resetAll'){
+    ev.preventDefault();
+    resetAll();
   }
 });
 
@@ -653,6 +808,7 @@ document.addEventListener('input', (ev)=>{
 (async function init(){
   try{
     await loadState();
+    await loadArchives();
     await loadAllPhotos();
     if(DATA.floor1.rooms.length) openRooms.add(DATA.floor1.rooms[0].id);
     renderAll();
