@@ -608,14 +608,14 @@ function renderPunch(){
   }
   const byRoom = {};
   flagged.forEach(it=>{
-    const key = it.room.name;
-    if(!byRoom[key]) byRoom[key]=[];
-    byRoom[key].push(it);
+    const key = it.floorKey + '::' + it.room.id;
+    if(!byRoom[key]) byRoom[key] = { label: `${DATA[it.floorKey].label} — ${it.room.name}`, items: [] };
+    byRoom[key].items.push(it);
   });
   let html = '';
-  Object.keys(byRoom).forEach(roomName=>{
-    html += `<div class="punch-group"><h3>${roomName}</h3>`;
-    byRoom[roomName].forEach(it=>{
+  Object.values(byRoom).forEach(group=>{
+    html += `<div class="punch-group"><h3>${group.label}</h3>`;
+    group.items.forEach(it=>{
       const e = getEntry(it.id);
       const photos = (e.photoIds||[]).filter(pid=>photoCache[pid]);
       html += `<div class="punch-item">
