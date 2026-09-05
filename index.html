@@ -78,7 +78,11 @@
   .note-wrap textarea::placeholder{color:#B98868;}
   .photo-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;}
   .photo-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--line-soft);flex-shrink:0;}
-  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;}
+  .lightbox{position:fixed;inset:0;background:rgba(8,16,26,.94);z-index:100;display:none;align-items:center;justify-content:center;padding:24px;}
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}
+  .lightbox-close{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:20px;line-height:1;cursor:pointer;}
   .photo-remove{position:absolute;top:2px;right:2px;background:rgba(15,42,69,.75);color:#fff;border:none;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer;padding:0;}
   .add-photo-btn{width:64px;height:64px;border:1.5px dashed var(--flag);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--flag);font-size:24px;cursor:pointer;background:#fff;flex-shrink:0;}
   .add-photo-btn input{display:none;}
@@ -123,6 +127,11 @@
 <main id="main"></main>
 
 <div class="toast" id="toast">Saved</div>
+
+<div class="lightbox" id="lightbox" data-action="closeLightbox">
+  <button class="lightbox-close" data-action="closeLightbox" aria-label="Close">&times;</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
 
 <script>
 /* ---------------- Storage (localStorage for checklist state/notes; both work standalone in Safari) ---------------- */
@@ -453,6 +462,16 @@ async function removePhoto(itemId, photoId){
   try{ await photoDbDelete(photoId); }catch(e){ /* already gone */ }
 }
 
+function openLightbox(src){
+  if(!src) return;
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('show');
+  document.getElementById('lightboxImg').src = '';
+}
+
 let toastTimer=null;
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -540,7 +559,7 @@ function itemRowHtml(room, idx, text){
       <div class="photo-row">
         ${(e.photoIds||[]).map(pid => photoCache[pid] ? `
           <div class="photo-thumb">
-            <img src="${photoCache[pid]}">
+            <img src="${photoCache[pid]}" data-action="viewphoto" data-pid="${pid}">
             <button class="photo-remove" data-action="removephoto" data-id="${id}" data-pid="${pid}">&times;</button>
           </div>` : `<div class="photo-uploading">loading</div>`).join('')}
         ${uploadingIds.has(id) ? `<div class="photo-uploading">saving&hellip;</div>` : `
@@ -602,7 +621,7 @@ function renderPunch(){
       html += `<div class="punch-item">
         <div class="pt">${it.text}</div>
         <div class="pn ${e.note?'':'empty'}">${e.note ? e.note : 'No note added'}</div>
-        ${photos.length ? `<div class="photo-row">${photos.map(pid=>`<div class="photo-thumb"><img src="${photoCache[pid]}"></div>`).join('')}</div>` : ''}
+        ${photos.length ? `<div class="photo-row">${photos.map(pid=>`<div class="photo-thumb"><img src="${photoCache[pid]}" data-action="viewphoto" data-pid="${pid}"></div>`).join('')}</div>` : ''}
       </div>`;
     });
     html += `</div>`;
@@ -653,7 +672,7 @@ function renderHistory(){
               ${statusHtml}
             </div>
             <div class="pn ${e.note?'':'empty'}">${e.note ? e.note : 'No note added'}</div>
-            ${photos.length ? `<div class="photo-row">${photos.map(pid=>`<div class="photo-thumb"><img src="${photoCache[pid]}"></div>`).join('')}</div>` : ''}
+            ${photos.length ? `<div class="photo-row">${photos.map(pid=>`<div class="photo-thumb"><img src="${photoCache[pid]}" data-action="viewphoto" data-pid="${pid}"></div>`).join('')}</div>` : ''}
           </div>`;
         }).join('');
         return `<div class="punch-group"><h3>${roomName}</h3>${rows}</div>`;
@@ -788,7 +807,15 @@ document.addEventListener('click', (ev)=>{
   } else if(action==='resetAll'){
     ev.preventDefault();
     resetAll();
+  } else if(action==='viewphoto'){
+    openLightbox(photoCache[t.dataset.pid]);
+  } else if(action==='closeLightbox'){
+    closeLightbox();
   }
+});
+
+document.addEventListener('keydown', (ev)=>{
+  if(ev.key==='Escape') closeLightbox();
 });
 
 document.addEventListener('change', (ev)=>{
