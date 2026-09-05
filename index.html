@@ -503,6 +503,14 @@ function findRoomById(roomId){
   return null;
 }
 
+function findFloorAndRoom(roomId){
+  for(const fk of FLOOR_ORDER){
+    const r = DATA[fk].rooms.find(rm=>rm.id===roomId);
+    if(r) return { floorKey: fk, room: r };
+  }
+  return null;
+}
+
 function compareStatus(id){
   const cur = getEntry(id);
   if(cur.checked) return 'fixed';
@@ -649,18 +657,19 @@ function renderHistory(){
     flaggedEntries.forEach(([id,e])=>{
       const [roomId, idxStr] = id.split('::');
       const idx = parseInt(idxStr, 10);
-      const room = findRoomById(roomId);
-      const roomName = room ? room.name : roomId;
-      if(!byRoom[roomName]) byRoom[roomName]=[];
-      byRoom[roomName].push({ id, e, text: room ? room.items[idx] : id });
+      const found = findFloorAndRoom(roomId);
+      const room = found ? found.room : null;
+      const label = found ? `${DATA[found.floorKey].label} — ${room.name}` : roomId;
+      if(!byRoom[roomId]) byRoom[roomId] = { label, items: [] };
+      byRoom[roomId].items.push({ id, e, text: room ? room.items[idx] : id });
     });
 
     let inner;
     if(flaggedEntries.length===0){
       inner = `<div class="item"><div class="item-text" style="font-style:italic;color:var(--ink-soft);">No issues were flagged in this walkthrough.</div></div>`;
     } else {
-      inner = Object.keys(byRoom).map(roomName=>{
-        const rows = byRoom[roomName].map(({id,e,text})=>{
+      inner = Object.values(byRoom).map(group=>{
+        const rows = group.items.map(({id,e,text})=>{
           const status = compareStatus(id);
           const statusHtml = status==='fixed' ? `<span class="status-chip fixed">Fixed</span>`
             : status==='open' ? `<span class="status-chip issue">Still an issue</span>`
@@ -675,7 +684,7 @@ function renderHistory(){
             ${photos.length ? `<div class="photo-row">${photos.map(pid=>`<div class="photo-thumb"><img src="${photoCache[pid]}" data-action="viewphoto" data-pid="${pid}"></div>`).join('')}</div>` : ''}
           </div>`;
         }).join('');
-        return `<div class="punch-group"><h3>${roomName}</h3>${rows}</div>`;
+        return `<div class="punch-group"><h3>${group.label}</h3>${rows}</div>`;
       }).join('');
     }
 
