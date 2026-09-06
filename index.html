@@ -116,10 +116,12 @@
   .head-top-actions{display:flex;gap:8px;flex-shrink:0;}
   .header-btn{background:rgba(255,255,255,.14);border:none;color:#fff;border-radius:7px;width:30px;height:30px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .header-btn.menu-btn{display:none;}
-  .header-menu{position:absolute;top:100%;right:16px;background:var(--navy-deep);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.4);padding:6px;min-width:210px;z-index:80;display:none;flex-direction:column;gap:2px;}
+  .header-menu{position:fixed;inset:0;background:var(--navy-deep);z-index:150;display:none;flex-direction:column;padding:16px;}
   .header-menu.show{display:flex;}
-  .header-menu button{background:none;border:none;color:#fff;text-align:left;padding:11px 14px;border-radius:7px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
-  .header-menu button:active{background:rgba(255,255,255,.1);}
+  .header-menu-top{display:flex;justify-content:flex-end;margin-bottom:24px;flex-shrink:0;}
+  .header-menu-close{background:rgba(255,255,255,.14);border:none;color:#fff;border-radius:7px;width:36px;height:36px;font-size:20px;line-height:1;cursor:pointer;}
+  .header-menu button.menu-item{background:none;border:none;border-bottom:1px solid rgba(255,255,255,.12);color:#fff;text-align:left;padding:18px 6px;font-family:var(--sans);font-size:17px;font-weight:600;cursor:pointer;}
+  .header-menu button.menu-item:active{background:rgba(255,255,255,.08);}
   @media (max-width: 480px){
     .head-top-actions{display:none;}
     .header-btn.menu-btn{display:flex;}
@@ -168,10 +170,13 @@
   </div>
   <nav class="tabs" id="tabs"></nav>
   <div class="header-menu" id="headerMenu">
-    <button data-action="menuHelp">How this works</button>
-    <button data-action="menuPrep">What to bring</button>
-    <button data-action="menuImport">Import floorplan</button>
-    <button data-action="menuEditInfo">Edit your info</button>
+    <div class="header-menu-top">
+      <button class="header-menu-close" data-action="toggleMenu" aria-label="Close menu">&times;</button>
+    </div>
+    <button class="menu-item" data-action="menuHelp">How this works</button>
+    <button class="menu-item" data-action="menuPrep">What to bring</button>
+    <button class="menu-item" data-action="menuImport">Import floorplan</button>
+    <button class="menu-item" data-action="menuEditInfo">Edit your info</button>
   </div>
 </header>
 
@@ -1472,12 +1477,6 @@ document.addEventListener('click', (ev)=>{
   }
 });
 
-document.addEventListener('click', (ev)=>{
-  const menu = document.getElementById('headerMenu');
-  if(!menu.classList.contains('show')) return;
-  if(ev.target.closest('#headerMenu') || ev.target.closest('#menuBtn')) return;
-  menu.classList.remove('show');
-});
 
 document.addEventListener('keydown', (ev)=>{
   if(ev.key==='Escape'){
