@@ -99,6 +99,8 @@
   .status-chip.fixed{background:var(--done-bg);color:var(--done);border-color:transparent;}
   .status-chip.issue{background:var(--flag-bg);color:var(--flag);border-color:transparent;}
   .archive-delete{background:none;border:1.5px solid var(--line-soft);color:var(--flag);border-radius:7px;width:28px;height:28px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .room-checkall-btn{background:none;border:1.5px solid var(--line-soft);color:var(--ink-soft);border-radius:7px;width:28px;height:28px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .room-checkall-btn.all-checked{background:var(--done-bg);border-color:var(--done);color:var(--done);}
   .chevron{width:9px;height:9px;border-right:2px solid var(--ink-soft);border-bottom:2px solid var(--ink-soft);transform:rotate(-45deg);transition:transform .2s;flex-shrink:0;}
   .room.open .chevron{transform:rotate(45deg);}
 
@@ -1145,6 +1147,24 @@ function roomCounts(room){
   return { done, total };
 }
 
+function roomEligibleItemIds(room){
+  const ids = room.items.map((_,idx)=>itemId(room.id, idx));
+  if(room.allowCustom){
+    getCustomItems(room.id).forEach(c=>ids.push(customItemId(room.id, c.id)));
+  }
+  return ids.filter(id=>!getEntry(id).flagged);
+}
+
+function checkAllRoom(roomId){
+  const room = findRoomById(roomId);
+  if(!room) return;
+  const eligibleIds = roomEligibleItemIds(room);
+  if(eligibleIds.length===0) return;
+  const target = !eligibleIds.every(id=>getEntry(id).checked);
+  eligibleIds.forEach(id=>setEntry(id, { checked: target }));
+  renderAll();
+}
+
 function overallCounts(){
   const flat = allItemsFlat();
   let done=0;
@@ -1260,6 +1280,11 @@ function roomHtml(room){
   const {done,total} = roomCounts(room);
   const complete = total>0 && done===total;
   const open = openRooms.has(room.id);
+  const eligibleIds = roomEligibleItemIds(room);
+  const allChecked = eligibleIds.length>0 && eligibleIds.every(id=>getEntry(id).checked);
+  const checkAllBtn = eligibleIds.length>0
+    ? `<button class="room-checkall-btn ${allChecked?'all-checked':''}" data-action="checkAllRoom" data-room="${room.id}" aria-label="${allChecked?'Uncheck all items in this room':'Check all items in this room'}">&#10003;</button>`
+    : '';
   return `
   <div class="room ${open?'open':''}" data-room="${room.id}">
     <div class="room-head" data-action="toggleRoom" data-room="${room.id}">
@@ -1268,6 +1293,7 @@ function roomHtml(room){
         ${room.dims ? `<div class="dims">${room.dims}</div>` : ''}
       </div>
       <div class="rprog">
+        ${checkAllBtn}
         <span class="chip ${complete?'complete':''}">${done}/${total}</span>
         <span class="chevron"></span>
       </div>
@@ -1520,6 +1546,8 @@ document.addEventListener('click', (ev)=>{
     const rid = t.dataset.room;
     if(openRooms.has(rid)) openRooms.delete(rid); else openRooms.add(rid);
     renderAll();
+  } else if(action==='checkAllRoom'){
+    checkAllRoom(t.dataset.room);
   } else if(action==='check'){
     const id = t.dataset.id;
     const cur = getEntry(id);
