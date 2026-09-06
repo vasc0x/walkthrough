@@ -885,10 +885,11 @@ function renderHistory(){
     main.innerHTML = `<div class="punch-empty"><b>No saved walkthroughs yet</b>When you finish a pass through the house, tap "Save &amp; New" on the Punch List tab to archive it (with full-resolution photos) and start the next one.</div>`;
     return;
   }
+  const fullTotal = allItemsFlat().length;
   const html = archives.map(a=>{
     const items = a.items || {};
     const flaggedEntries = Object.entries(items).filter(([,e])=>e.flagged);
-    const total = Object.values(items).length;
+    const total = fullTotal;
     const done = Object.values(items).filter(e=>e.checked).length;
     const open = openArchives.has(a.id);
     const dateStr = new Date(a.savedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
