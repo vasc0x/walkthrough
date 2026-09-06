@@ -147,7 +147,7 @@
     </div>
   </div>
   <div class="overall">
-    <div class="overall-row"><span id="overallLabel">0 / 0 checked</span><span id="overallPct">0%</span></div>
+    <div class="overall-row"><span id="overallLabel">0 / 0 inspected</span><span id="overallPct">0%</span></div>
     <div class="bar-track"><div class="bar-fill" id="overallBar" style="width:0%"></div></div>
   </div>
   <nav class="tabs" id="tabs"></nav>
@@ -714,14 +714,16 @@ function showToast(msg){
 }
 
 /* ---------------- Render ---------------- */
+function isInspected(e){ return e.checked || e.flagged; }
+
 function roomCounts(room){
   let done=0;
-  room.items.forEach((_,idx)=>{ if(getEntry(itemId(room.id,idx)).checked) done++; });
+  room.items.forEach((_,idx)=>{ if(isInspected(getEntry(itemId(room.id,idx)))) done++; });
   let total = room.items.length;
   if(room.allowCustom){
     const customs = getCustomItems(room.id);
     total += customs.length;
-    customs.forEach(c=>{ if(getEntry(customItemId(room.id,c.id)).checked) done++; });
+    customs.forEach(c=>{ if(isInspected(getEntry(customItemId(room.id,c.id)))) done++; });
   }
   return { done, total };
 }
@@ -729,7 +731,7 @@ function roomCounts(room){
 function overallCounts(){
   const flat = allItemsFlat();
   let done=0;
-  flat.forEach(it=>{ if(getEntry(it.id).checked) done++; });
+  flat.forEach(it=>{ if(isInspected(getEntry(it.id))) done++; });
   return { done, total: flat.length };
 }
 
@@ -783,7 +785,7 @@ function renderTabs(){
 function renderOverall(){
   const {done,total} = overallCounts();
   const pct = total? Math.round(done/total*100) : 0;
-  document.getElementById('overallLabel').textContent = `${done} / ${total} checked`;
+  document.getElementById('overallLabel').textContent = `${done} / ${total} inspected`;
   document.getElementById('overallPct').textContent = pct + '%';
   document.getElementById('overallBar').style.width = pct + '%';
 }
@@ -891,7 +893,7 @@ function renderHistory(){
     const items = a.items || {};
     const flaggedEntries = Object.entries(items).filter(([,e])=>e.flagged);
     const total = fullTotal;
-    const done = Object.values(items).filter(e=>e.checked || e.flagged).length;
+    const done = Object.values(items).filter(isInspected).length;
     const open = openArchives.has(a.id);
     const dateStr = new Date(a.savedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 
@@ -1012,7 +1014,7 @@ function saveAndStartNew(){
   const flat = allItemsFlat();
   const total = flat.length;
   const flaggedCount = flat.filter(it=>getEntry(it.id).flagged).length;
-  const inspected = flat.filter(it=>{ const e=getEntry(it.id); return e.checked || e.flagged; }).length;
+  const inspected = flat.filter(it=>isInspected(getEntry(it.id))).length;
   const remaining = total - inspected;
   const defaultLabel = `Walkthrough ${archives.length + 1} - ${formatDateLabel(new Date())}`;
   const label = prompt('Save this walkthrough as:', defaultLabel);
