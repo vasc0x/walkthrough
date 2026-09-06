@@ -217,6 +217,7 @@
 
 <div class="modal-overlay" id="prepModal">
   <div class="modal-card">
+    <div class="tour-progress" id="prepTourProgress" hidden></div>
     <h2>What to bring</h2>
     <p>A few things that make the walkthrough go a lot smoother:</p>
     <ul>
@@ -238,6 +239,7 @@
 
 <div class="modal-overlay" id="importModal">
   <div class="modal-card">
+    <div class="tour-progress" id="importTourProgress" hidden></div>
     <h2>Import your floorplan</h2>
     <p>Turn a photo of your own floorplan into this checklist using any AI that can read images (Claude, ChatGPT, Gemini, etc).</p>
     <p><b>Step 1</b> — copy this prompt and send it to an AI along with a photo of each floor's plan:</p>
@@ -860,7 +862,12 @@ function closeLightbox(){
 }
 
 function openModal(id){ document.getElementById(id).classList.add('show'); }
-function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+  if(tourActive && TOUR_STEPS[tourIndex] && tourModalId(TOUR_STEPS[tourIndex]) === id){
+    advanceTour();
+  }
+}
 
 function possessive(name){
   return /s$/i.test(name) ? `${name}'` : `${name}'s`;
@@ -894,51 +901,94 @@ function saveInfoModal(){
   closeModal('infoModal');
 }
 
+function setupImportModal(){
+  document.getElementById('importError').hidden = true;
+  document.getElementById('importJsonInput').value = '';
+  document.getElementById('importStatusLine').textContent = DATA_ORIGIN==='imported'
+    ? 'Currently using: your imported floorplan.'
+    : 'Currently using: the example checklist.';
+  document.getElementById('restoreDefaultRow').hidden = DATA_ORIGIN !== 'imported';
+}
+
 /* ---------------- Onboarding tour ---------------- */
 const TOUR_STEPS = [
-  { title: 'Welcome', body: `<p>This app helps you walk a new home room by room and keep track of anything that needs fixing — all stored privately on this device.</p>` },
-  { title: 'Check off each room', body: `<p>Go floor by floor and check off each item as you verify it.</p><p>Found a problem? Tap the flag icon, describe it, and attach full-resolution photos.</p>` },
-  { title: 'Your Punch List', body: `<p>The <b>Punch List</b> tab collects everything you've flagged, and lets you copy it as text to send to your builder.</p><p>Finished a pass through the house? Tap <b>Save &amp; New</b> to archive it and start fresh.</p>` },
-  { title: 'Compare walkthroughs', body: `<p>The <b>History</b> tab keeps every past walkthrough and shows whether each flagged issue was later fixed — perfect for comparing a follow-up visit against the first.</p><p>Everything stays on this device, in this browser — come back on the <b>same device and browser</b> to see it again.</p>` }
+  { type:'info', title: 'Welcome', body: `<p>This app helps you walk a new home room by room and keep track of anything that needs fixing — all stored privately on this device.</p>` },
+  { type:'info', title: 'Check off each room', body: `<p>Go floor by floor and check off each item as you verify it.</p><p>Found a problem? Tap the flag icon, describe it, and attach full-resolution photos.</p>` },
+  { type:'info', title: 'Your Punch List', body: `<p>The <b>Punch List</b> tab collects everything you've flagged, and lets you copy it as text to send to your builder.</p><p>Finished a pass through the house? Tap <b>Save &amp; New</b> to archive it and start fresh.</p>` },
+  { type:'info', title: 'Compare walkthroughs', body: `<p>The <b>History</b> tab keeps every past walkthrough and shows whether each flagged issue was later fixed — perfect for comparing a follow-up visit against the first.</p><p>Everything stays on this device, in this browser — come back on the <b>same device and browser</b> to see it again.</p>` },
+  { type:'prep' },
+  { type:'import' },
+  { type:'userinfo' }
 ];
 let tourIndex = 0;
+let tourActive = false;
 let onboardingInProgress = false;
 
-function renderTourStep(){
+function tourModalId(step){
+  if(step.type==='prep') return 'prepModal';
+  if(step.type==='import') return 'importModal';
+  if(step.type==='userinfo') return 'infoModal';
+  return 'introModal';
+}
+
+function showTourStep(){
   const step = TOUR_STEPS[tourIndex];
-  document.getElementById('tourProgress').textContent = `Step ${tourIndex+1} of ${TOUR_STEPS.length+1}`;
-  document.getElementById('tourTitle').textContent = step.title;
-  document.getElementById('tourBody').innerHTML = step.body;
-  document.getElementById('tourBackBtn').hidden = tourIndex===0;
-  document.getElementById('tourNextBtn').textContent = tourIndex===TOUR_STEPS.length-1 ? 'Next: your info' : 'Next';
-}
-
-function startTour(){
-  tourIndex = 0;
-  renderTourStep();
-  openModal('introModal');
-}
-
-function finishIntro(){
-  closeModal('introModal');
-  storage.set('walkthrough-intro-seen', '1');
-  if(!appInfo.ownerName && !appInfo.builder && !appInfo.address){
+  const targetId = tourModalId(step);
+  ['introModal','prepModal','importModal','infoModal'].forEach(id=>{
+    if(id !== targetId) document.getElementById(id).classList.remove('show');
+  });
+  const stepLabel = `Step ${tourIndex+1} of ${TOUR_STEPS.length}`;
+  if(step.type==='info'){
+    document.getElementById('tourProgress').textContent = stepLabel;
+    document.getElementById('tourTitle').textContent = step.title;
+    document.getElementById('tourBody').innerHTML = step.body;
+    document.getElementById('tourBackBtn').hidden = tourIndex===0;
+    document.getElementById('tourNextBtn').textContent = 'Next';
+    openModal('introModal');
+  } else if(step.type==='prep'){
+    document.getElementById('prepTourProgress').textContent = stepLabel;
+    document.getElementById('prepTourProgress').hidden = false;
+    openModal('prepModal');
+  } else if(step.type==='import'){
+    setupImportModal();
+    document.getElementById('importTourProgress').textContent = stepLabel;
+    document.getElementById('importTourProgress').hidden = false;
+    openModal('importModal');
+  } else if(step.type==='userinfo'){
     onboardingInProgress = true;
     openInfoModal();
+    document.getElementById('infoTourProgress').textContent = stepLabel;
   }
 }
 
-document.getElementById('tourNextBtn').onclick = ()=>{
+function startTour(){
+  tourActive = true;
+  tourIndex = 0;
+  showTourStep();
+}
+
+function advanceTour(){
   tourIndex++;
-  if(tourIndex >= TOUR_STEPS.length) finishIntro();
-  else renderTourStep();
-};
+  if(tourIndex >= TOUR_STEPS.length){
+    tourActive = false;
+    storage.set('walkthrough-intro-seen', '1');
+  } else {
+    showTourStep();
+  }
+}
+
+function skipTour(){
+  tourIndex = TOUR_STEPS.length - 1;
+  showTourStep();
+}
+
+document.getElementById('tourNextBtn').onclick = ()=>closeModal('introModal');
 document.getElementById('tourBackBtn').onclick = ()=>{
-  if(tourIndex>0){ tourIndex--; renderTourStep(); }
+  if(tourIndex>0){ tourIndex--; showTourStep(); }
 };
 document.getElementById('tourSkipLink').onclick = (ev)=>{
   ev.preventDefault();
-  finishIntro();
+  skipTour();
 };
 
 document.getElementById('helpBtn').onclick = startTour;
@@ -947,12 +997,7 @@ document.getElementById('prepDoneBtn').onclick = ()=>closeModal('prepModal');
 document.getElementById('editInfoBtn').onclick = ()=>{ onboardingInProgress = false; openInfoModal(); };
 
 document.getElementById('importBtn').onclick = ()=>{
-  document.getElementById('importError').hidden = true;
-  document.getElementById('importJsonInput').value = '';
-  document.getElementById('importStatusLine').textContent = DATA_ORIGIN==='imported'
-    ? 'Currently using: your imported floorplan.'
-    : 'Currently using: the example checklist.';
-  document.getElementById('restoreDefaultRow').hidden = DATA_ORIGIN !== 'imported';
+  setupImportModal();
   openModal('importModal');
 };
 document.getElementById('copyPromptBtn').onclick = ()=>{
@@ -973,9 +1018,7 @@ document.getElementById('importCancelBtn').onclick = ()=>closeModal('importModal
 
 document.querySelectorAll('.modal-overlay').forEach(overlay=>{
   overlay.addEventListener('click', (ev)=>{
-    if(ev.target !== overlay) return;
-    if(overlay.id === 'introModal') finishIntro();
-    else closeModal(overlay.id);
+    if(ev.target === overlay) closeModal(overlay.id);
   });
 });
 document.getElementById('importApplyBtn').onclick = async ()=>{
@@ -1439,10 +1482,7 @@ document.addEventListener('click', (ev)=>{
 document.addEventListener('keydown', (ev)=>{
   if(ev.key==='Escape'){
     closeLightbox();
-    closeModal('introModal');
-    closeModal('infoModal');
-    closeModal('prepModal');
-    closeModal('importModal');
+    document.querySelectorAll('.modal-overlay.show').forEach(overlay=>closeModal(overlay.id));
     document.getElementById('headerMenu').classList.remove('show');
   }
 });
