@@ -28,7 +28,7 @@
   body{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
 
   /* ---------- Header ---------- */
-  header{background:var(--navy);color:#fff;flex:0 0 auto;}
+  header{background:var(--navy);color:#fff;flex:0 0 auto;position:relative;}
   .head-top{display:flex;align-items:baseline;justify-content:space-between;padding:16px 20px 10px;}
   .head-top h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.2px;}
   .head-top .sub{font-family:var(--mono);font-size:12px;color:#9FB6CB;margin-top:3px;}
@@ -115,6 +115,15 @@
   /* ---------- Header info + modals ---------- */
   .head-top-actions{display:flex;gap:8px;flex-shrink:0;}
   .header-btn{background:rgba(255,255,255,.14);border:none;color:#fff;border-radius:7px;width:30px;height:30px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .header-btn.menu-btn{display:none;}
+  .header-menu{position:absolute;top:100%;right:16px;background:var(--navy-deep);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.4);padding:6px;min-width:210px;z-index:80;display:none;flex-direction:column;gap:2px;}
+  .header-menu.show{display:flex;}
+  .header-menu button{background:none;border:none;color:#fff;text-align:left;padding:11px 14px;border-radius:7px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+  .header-menu button:active{background:rgba(255,255,255,.1);}
+  @media (max-width: 480px){
+    .head-top-actions{display:none;}
+    .header-btn.menu-btn{display:flex;}
+  }
   .head-top .sub.placeholder{color:#7C93A9;font-style:italic;}
 
   .modal-overlay{position:fixed;inset:0;background:rgba(8,16,26,.6);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
@@ -150,12 +159,19 @@
       <button class="header-btn" id="importBtn" aria-label="Import your floorplan">&#128208;</button>
       <button class="header-btn" id="editInfoBtn" aria-label="Edit your info">&#9998;</button>
     </div>
+    <button class="header-btn menu-btn" id="menuBtn" data-action="toggleMenu" aria-label="Menu">&#9776;</button>
   </div>
   <div class="overall">
     <div class="overall-row"><span id="overallLabel">0 / 0 inspected</span><span id="overallPct">0%</span></div>
     <div class="bar-track"><div class="bar-fill" id="overallBar" style="width:0%"></div></div>
   </div>
   <nav class="tabs" id="tabs"></nav>
+  <div class="header-menu" id="headerMenu">
+    <button data-action="menuHelp">How this works</button>
+    <button data-action="menuPrep">What to bring</button>
+    <button data-action="menuImport">Import floorplan</button>
+    <button data-action="menuEditInfo">Edit your info</button>
+  </div>
 </header>
 
 <main id="main"></main>
@@ -1349,7 +1365,28 @@ document.addEventListener('click', (ev)=>{
     openLightbox(photoCache[t.dataset.pid]);
   } else if(action==='closeLightbox'){
     closeLightbox();
+  } else if(action==='toggleMenu'){
+    document.getElementById('headerMenu').classList.toggle('show');
+  } else if(action==='menuHelp'){
+    document.getElementById('headerMenu').classList.remove('show');
+    openModal('introModal');
+  } else if(action==='menuPrep'){
+    document.getElementById('headerMenu').classList.remove('show');
+    openModal('prepModal');
+  } else if(action==='menuImport'){
+    document.getElementById('headerMenu').classList.remove('show');
+    document.getElementById('importBtn').click();
+  } else if(action==='menuEditInfo'){
+    document.getElementById('headerMenu').classList.remove('show');
+    openInfoModal();
   }
+});
+
+document.addEventListener('click', (ev)=>{
+  const menu = document.getElementById('headerMenu');
+  if(!menu.classList.contains('show')) return;
+  if(ev.target.closest('#headerMenu') || ev.target.closest('#menuBtn')) return;
+  menu.classList.remove('show');
 });
 
 document.addEventListener('keydown', (ev)=>{
@@ -1359,6 +1396,7 @@ document.addEventListener('keydown', (ev)=>{
     closeModal('infoModal');
     closeModal('prepModal');
     closeModal('importModal');
+    document.getElementById('headerMenu').classList.remove('show');
   }
 });
 
