@@ -891,7 +891,7 @@ function renderHistory(){
     const items = a.items || {};
     const flaggedEntries = Object.entries(items).filter(([,e])=>e.flagged);
     const total = fullTotal;
-    const done = Object.values(items).filter(e=>e.checked).length;
+    const done = Object.values(items).filter(e=>e.checked || e.flagged).length;
     const open = openArchives.has(a.id);
     const dateStr = new Date(a.savedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 
