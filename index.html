@@ -141,6 +141,7 @@
     </div>
     <div class="head-top-actions">
       <button class="header-btn" id="helpBtn" aria-label="How this works">?</button>
+      <button class="header-btn" id="prepBtn" aria-label="What to bring">&#129717;</button>
       <button class="header-btn" id="editInfoBtn" aria-label="Edit your info">&#9998;</button>
     </div>
   </div>
@@ -191,6 +192,27 @@
     <div class="modal-actions">
       <button class="secondary" id="infoSkipBtn">Skip for now</button>
       <button class="primary" id="infoSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="prepModal">
+  <div class="modal-card">
+    <h2>What to bring</h2>
+    <p>A few things that make the walkthrough go a lot smoother:</p>
+    <ul>
+      <li><b>Blue painter's tape</b> — flag problem spots right on the wall/floor/cabinet as you find them, so the builder can find them later too.</li>
+      <li><b>Tape measure</b> — double-check room dimensions against the floor plan.</li>
+      <li><b>Phone or tablet, charged</b> — for this checklist and its photos (a portable charger doesn't hurt).</li>
+      <li><b>Flashlight</b> — attics, crawl spaces, closets, and under sinks are rarely well lit.</li>
+      <li><b>Outlet/GFCI tester</b> — a cheap 3-light plug-in tester checks wiring and GFCI trip/reset in seconds.</li>
+      <li><b>Small level</b> — checks doors, cabinets, and countertops for square.</li>
+      <li><b>Notepad and pen</b> — a low-tech backup if your device dies.</li>
+      <li><b>Your builder's spec sheet/contract</b> — to confirm included features actually made it into the house.</li>
+      <li>Comfortable clothes and shoes you don't mind getting a little dusty.</li>
+    </ul>
+    <div class="modal-actions">
+      <button class="primary" id="prepDoneBtn">Got it</button>
     </div>
   </div>
 </div>
@@ -350,6 +372,14 @@ const DATA = {
         "Flooring free of defects",
         "Walls and ceiling free of cracks"
       ]},
+      { id:"ownerbath", name:"Owner's Bath", dims:null, items:[
+        "Sink faucet(s) work, no leaks under sink",
+        "Toilet flushes properly, no rocking",
+        "Tub/shower caulking is complete, no gaps",
+        "Exhaust fan runs and vents to exterior",
+        "GFCI outlets test and reset",
+        "Mirror/medicine cabinet is secure"
+      ]},
       { id:"closet", name:"Walk-In Closet", dims:null, items:[
         "Shelving and rod are secure",
         "Light fixture works",
@@ -359,14 +389,6 @@ const DATA = {
         "Shelving/wire racks are secure",
         "Door operates smoothly and latches",
         "No signs of moisture, cracks, or damage"
-      ]},
-      { id:"ownerbath", name:"Owner's Bath", dims:null, items:[
-        "Dual sink faucets work, no leaks under sink",
-        "Toilet flushes properly, no rocking",
-        "Tub/shower caulking is complete, no gaps",
-        "Exhaust fan runs and vents to exterior",
-        "GFCI outlets test and reset",
-        "Mirror/medicine cabinet is secure"
       ]},
       { id:"laundry", name:"Laundry", dims:null, items:[
         "Washer hot/cold valves present, no leaks",
@@ -668,6 +690,8 @@ function saveInfoModal(){
 }
 
 document.getElementById('helpBtn').onclick = ()=>openModal('introModal');
+document.getElementById('prepBtn').onclick = ()=>openModal('prepModal');
+document.getElementById('prepDoneBtn').onclick = ()=>closeModal('prepModal');
 document.getElementById('editInfoBtn').onclick = openInfoModal;
 document.getElementById('introDoneBtn').onclick = ()=>{
   closeModal('introModal');
@@ -1084,6 +1108,7 @@ document.addEventListener('keydown', (ev)=>{
     closeLightbox();
     closeModal('introModal');
     closeModal('infoModal');
+    closeModal('prepModal');
   }
 });
 
