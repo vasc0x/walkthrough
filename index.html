@@ -1011,12 +1011,16 @@ function formatDateLabel(d){
 function saveAndStartNew(){
   const flat = allItemsFlat();
   const total = flat.length;
-  const done = flat.filter(it=>getEntry(it.id).checked).length;
   const flaggedCount = flat.filter(it=>getEntry(it.id).flagged).length;
+  const inspected = flat.filter(it=>{ const e=getEntry(it.id); return e.checked || e.flagged; }).length;
+  const remaining = total - inspected;
   const defaultLabel = `Walkthrough ${archives.length + 1} - ${formatDateLabel(new Date())}`;
   const label = prompt('Save this walkthrough as:', defaultLabel);
   if(label===null) return;
-  if(!confirm(`Save "${label || defaultLabel}" (${done}/${total} checked, ${flaggedCount} flagged) and start a new checklist?`)) return;
+  const remainingWarning = remaining > 0
+    ? `\n\n⚠ ${remaining} feature${remaining===1?'':'s'} still ${remaining===1?"hasn't":"haven't"} been checked or flagged — starting a new walkthrough will leave ${remaining===1?'it':'them'} unverified.`
+    : '';
+  if(!confirm(`Save "${label || defaultLabel}"?\n\n${inspected}/${total} features inspected, ${flaggedCount} flagged.${remainingWarning}`)) return;
   const archivedItems = {};
   Object.keys(state.items).forEach(id=>{
     const text = resolveItemText(id);
