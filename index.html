@@ -925,8 +925,13 @@ document.getElementById('importFileInput').addEventListener('change', (ev)=>{
   ev.target.value = '';
 });
 document.getElementById('importCancelBtn').onclick = ()=>closeModal('importModal');
-document.getElementById('importModal').addEventListener('click', (ev)=>{
-  if(ev.target.id === 'importModal') closeModal('importModal');
+
+document.querySelectorAll('.modal-overlay').forEach(overlay=>{
+  overlay.addEventListener('click', (ev)=>{
+    if(ev.target !== overlay) return;
+    if(overlay.id === 'introModal') finishIntro();
+    else closeModal(overlay.id);
+  });
 });
 document.getElementById('importApplyBtn').onclick = async ()=>{
   const raw = document.getElementById('importJsonInput').value.trim();
@@ -950,13 +955,14 @@ document.getElementById('restoreDefaultBtn').onclick = async ()=>{
   await restoreDefaultChecklist();
   closeModal('importModal');
 };
-document.getElementById('introDoneBtn').onclick = ()=>{
+function finishIntro(){
   closeModal('introModal');
   storage.set('walkthrough-intro-seen', '1');
   if(!appInfo.ownerName && !appInfo.builder && !appInfo.address){
     openInfoModal();
   }
-};
+}
+document.getElementById('introDoneBtn').onclick = finishIntro;
 document.getElementById('infoSaveBtn').onclick = saveInfoModal;
 document.getElementById('infoSkipBtn').onclick = ()=>closeModal('infoModal');
 
