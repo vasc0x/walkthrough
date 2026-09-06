@@ -130,6 +130,7 @@
   .modal-overlay.show{display:flex;}
   .modal-card{background:var(--card);border-radius:14px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;padding:22px 20px;}
   .modal-card h2{margin:0 0 10px;font-size:18px;color:var(--ink);}
+  .tour-progress{font-family:var(--mono);font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:700;}
   .modal-card p{margin:0 0 12px;font-size:13.5px;color:var(--ink-soft);line-height:1.5;}
   .modal-card ul{margin:0 0 4px;padding-left:20px;font-size:13.5px;color:var(--ink-soft);line-height:1.65;}
   .modal-card ul li{margin-bottom:6px;}
@@ -185,24 +186,20 @@
 
 <div class="modal-overlay" id="introModal">
   <div class="modal-card">
-    <h2>Welcome</h2>
-    <p>This app helps you walk a new home room by room and keep track of anything that needs fixing.</p>
-    <ul>
-      <li>Go floor by floor and check off each item as you verify it.</li>
-      <li>Found a problem? Tap the flag icon, describe it, and attach full-resolution photos.</li>
-      <li>The <b>Punch List</b> tab collects everything you've flagged, and can copy it as text to send to your builder.</li>
-      <li>Finished a pass through the house? Tap <b>Save &amp; New</b> to archive it and start fresh.</li>
-      <li>The <b>History</b> tab keeps every past walkthrough and shows whether each flagged issue was later fixed — great for comparing a follow-up visit against the first.</li>
-      <li>Everything is stored only on this device, in this browser — nothing is uploaded anywhere. To see a previous walkthrough later, come back on this <b>same device and browser</b> — it won't show up on a different phone, computer, or browser app.</li>
-    </ul>
+    <div class="tour-progress" id="tourProgress"></div>
+    <h2 id="tourTitle"></h2>
+    <div id="tourBody"></div>
     <div class="modal-actions">
-      <button class="primary" id="introDoneBtn">Got it, let's go</button>
+      <button class="secondary" id="tourBackBtn">Back</button>
+      <button class="primary" id="tourNextBtn">Next</button>
     </div>
+    <p style="text-align:center;margin:12px 0 0;"><a href="#" id="tourSkipLink" style="color:var(--ink-soft);font-size:12.5px;text-decoration:underline;">Skip tour</a></p>
   </div>
 </div>
 
 <div class="modal-overlay" id="infoModal">
   <div class="modal-card">
+    <div class="tour-progress" id="infoTourProgress" hidden>Step 5 of 5</div>
     <h2>Your walkthrough info</h2>
     <p>Shown at the top of the checklist. This stays on this device — nothing is sent anywhere.</p>
     <label for="infoOwner">Your name</label>
@@ -883,6 +880,7 @@ function openInfoModal(){
   document.getElementById('infoOwner').value = appInfo.ownerName || '';
   document.getElementById('infoBuilder').value = appInfo.builder || '';
   document.getElementById('infoAddress').value = appInfo.address || '';
+  document.getElementById('infoTourProgress').hidden = !onboardingInProgress;
   openModal('infoModal');
 }
 function saveInfoModal(){
@@ -896,10 +894,57 @@ function saveInfoModal(){
   closeModal('infoModal');
 }
 
-document.getElementById('helpBtn').onclick = ()=>openModal('introModal');
+/* ---------------- Onboarding tour ---------------- */
+const TOUR_STEPS = [
+  { title: 'Welcome', body: `<p>This app helps you walk a new home room by room and keep track of anything that needs fixing — all stored privately on this device.</p>` },
+  { title: 'Check off each room', body: `<p>Go floor by floor and check off each item as you verify it.</p><p>Found a problem? Tap the flag icon, describe it, and attach full-resolution photos.</p>` },
+  { title: 'Your Punch List', body: `<p>The <b>Punch List</b> tab collects everything you've flagged, and lets you copy it as text to send to your builder.</p><p>Finished a pass through the house? Tap <b>Save &amp; New</b> to archive it and start fresh.</p>` },
+  { title: 'Compare walkthroughs', body: `<p>The <b>History</b> tab keeps every past walkthrough and shows whether each flagged issue was later fixed — perfect for comparing a follow-up visit against the first.</p><p>Everything stays on this device, in this browser — come back on the <b>same device and browser</b> to see it again.</p>` }
+];
+let tourIndex = 0;
+let onboardingInProgress = false;
+
+function renderTourStep(){
+  const step = TOUR_STEPS[tourIndex];
+  document.getElementById('tourProgress').textContent = `Step ${tourIndex+1} of ${TOUR_STEPS.length+1}`;
+  document.getElementById('tourTitle').textContent = step.title;
+  document.getElementById('tourBody').innerHTML = step.body;
+  document.getElementById('tourBackBtn').hidden = tourIndex===0;
+  document.getElementById('tourNextBtn').textContent = tourIndex===TOUR_STEPS.length-1 ? 'Next: your info' : 'Next';
+}
+
+function startTour(){
+  tourIndex = 0;
+  renderTourStep();
+  openModal('introModal');
+}
+
+function finishIntro(){
+  closeModal('introModal');
+  storage.set('walkthrough-intro-seen', '1');
+  if(!appInfo.ownerName && !appInfo.builder && !appInfo.address){
+    onboardingInProgress = true;
+    openInfoModal();
+  }
+}
+
+document.getElementById('tourNextBtn').onclick = ()=>{
+  tourIndex++;
+  if(tourIndex >= TOUR_STEPS.length) finishIntro();
+  else renderTourStep();
+};
+document.getElementById('tourBackBtn').onclick = ()=>{
+  if(tourIndex>0){ tourIndex--; renderTourStep(); }
+};
+document.getElementById('tourSkipLink').onclick = (ev)=>{
+  ev.preventDefault();
+  finishIntro();
+};
+
+document.getElementById('helpBtn').onclick = startTour;
 document.getElementById('prepBtn').onclick = ()=>openModal('prepModal');
 document.getElementById('prepDoneBtn').onclick = ()=>closeModal('prepModal');
-document.getElementById('editInfoBtn').onclick = openInfoModal;
+document.getElementById('editInfoBtn').onclick = ()=>{ onboardingInProgress = false; openInfoModal(); };
 
 document.getElementById('importBtn').onclick = ()=>{
   document.getElementById('importError').hidden = true;
@@ -955,14 +1000,6 @@ document.getElementById('restoreDefaultBtn').onclick = async ()=>{
   await restoreDefaultChecklist();
   closeModal('importModal');
 };
-function finishIntro(){
-  closeModal('introModal');
-  storage.set('walkthrough-intro-seen', '1');
-  if(!appInfo.ownerName && !appInfo.builder && !appInfo.address){
-    openInfoModal();
-  }
-}
-document.getElementById('introDoneBtn').onclick = finishIntro;
 document.getElementById('infoSaveBtn').onclick = saveInfoModal;
 document.getElementById('infoSkipBtn').onclick = ()=>closeModal('infoModal');
 
@@ -1378,7 +1415,7 @@ document.addEventListener('click', (ev)=>{
     document.getElementById('headerMenu').classList.toggle('show');
   } else if(action==='menuHelp'){
     document.getElementById('headerMenu').classList.remove('show');
-    openModal('introModal');
+    startTour();
   } else if(action==='menuPrep'){
     document.getElementById('headerMenu').classList.remove('show');
     openModal('prepModal');
@@ -1387,6 +1424,7 @@ document.addEventListener('click', (ev)=>{
     document.getElementById('importBtn').click();
   } else if(action==='menuEditInfo'){
     document.getElementById('headerMenu').classList.remove('show');
+    onboardingInProgress = false;
     openInfoModal();
   }
 });
@@ -1436,7 +1474,7 @@ document.addEventListener('input', (ev)=>{
     renderAll();
     const seenIntro = await storage.get('walkthrough-intro-seen');
     if(!seenIntro || !seenIntro.value){
-      openModal('introModal');
+      startTour();
     }
   }catch(e){
     console.error('Init failed', e);
