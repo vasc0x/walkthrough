@@ -130,6 +130,10 @@
   .modal-actions button{flex:1;border:none;border-radius:9px;padding:12px;font-size:14.5px;font-weight:700;font-family:var(--sans);cursor:pointer;}
   .modal-actions .primary{background:var(--cyan);color:var(--navy-deep);}
   .modal-actions .secondary{background:var(--surface);color:var(--ink-soft);}
+  .modal-card textarea{width:100%;border:1.5px solid var(--line-soft);border-radius:7px;padding:9px 11px;font-family:var(--mono);font-size:12px;color:var(--ink);background:#fff;resize:vertical;min-height:100px;}
+  .prompt-box{background:var(--surface);border:1px solid var(--line-soft);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.5;white-space:pre-wrap;color:var(--ink);max-height:220px;overflow-y:auto;margin:0 0 10px;}
+  .import-error{color:var(--flag);font-size:12.5px;margin-top:10px;}
+  .file-choose-btn{display:block;width:100%;text-align:center;margin-bottom:10px;box-sizing:border-box;}
 </style>
 </head>
 <body>
@@ -143,6 +147,7 @@
     <div class="head-top-actions">
       <button class="header-btn" id="helpBtn" aria-label="How this works">?</button>
       <button class="header-btn" id="prepBtn" aria-label="What to bring">&#128736;</button>
+      <button class="header-btn" id="importBtn" aria-label="Import your floorplan">&#128208;</button>
       <button class="header-btn" id="editInfoBtn" aria-label="Edit your info">&#9998;</button>
     </div>
   </div>
@@ -218,6 +223,68 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="importModal">
+  <div class="modal-card">
+    <h2>Import your floorplan</h2>
+    <p>Turn a photo of your own floorplan into this checklist using any AI that can read images (Claude, ChatGPT, Gemini, etc).</p>
+    <p><b>Step 1</b> — copy this prompt and send it to an AI along with a photo of each floor's plan:</p>
+    <pre class="prompt-box" id="importPromptText">You are helping me build a home walkthrough checklist from floorplan images.
+
+I will share one or more floorplan images, one per floor level. For each image:
+1. Identify every distinct labeled room or space (bedrooms, bathrooms, kitchen, closets, storage, garage, patio, etc).
+2. Note each room's dimensions if they're labeled on the plan (e.g. 12' x 10'). Use null if not labeled.
+3. For each room, write a short, practical checklist of 3-8 items a homeowner should verify during a new-construction walkthrough for that specific room type (outlets, fixtures, doors/windows, flooring, plumbing, appliances, ventilation — whatever applies to that room).
+
+Output ONLY valid JSON, no markdown formatting, no code fences, no commentary before or after — just the JSON object, in exactly this structure:
+
+{
+  "floors": [
+    {
+      "key": "floor1",
+      "label": "1st Floor",
+      "rooms": [
+        {
+          "id": "kitchen",
+          "name": "Kitchen",
+          "dims": "10' x 12'",
+          "items": [
+            "Cabinets and drawers open smoothly and align",
+            "Countertop seams are tight, no chips"
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+Rules:
+- "key" for each floor is a short unique slug, e.g. floor1, floor2, basement, garage.
+- "id" for each room is a short unique slug (lowercase, no spaces or punctuation) — it must be unique across the ENTIRE house, not just within one floor.
+- "dims" is a string like 10' x 12', or null if not shown on the plan.
+- "items" is an array of plain strings, each one checklist item.
+- Include every floor I show you as its own entry in "floors", in the order I share the images.
+- Do not include any text outside the JSON object.</pre>
+    <div class="modal-actions">
+      <button class="secondary" id="copyPromptBtn">Copy prompt</button>
+    </div>
+    <p style="margin-top:18px;"><b>Step 2</b> — paste the JSON it gives back (or load a .json file), then import it:</p>
+    <label class="add-item-btn file-choose-btn">
+      Choose a .json file
+      <input type="file" accept=".json,application/json" id="importFileInput" style="display:none;">
+    </label>
+    <textarea id="importJsonInput" rows="6" placeholder='{"floors": [...]}'></textarea>
+    <div class="import-error" id="importError" hidden></div>
+    <p id="importStatusLine" style="margin:14px 0 0;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);"></p>
+    <div class="modal-actions">
+      <button class="secondary" id="importCancelBtn">Cancel</button>
+      <button class="primary" id="importApplyBtn">Import</button>
+    </div>
+    <div class="modal-actions" id="restoreDefaultRow" hidden>
+      <button class="secondary" id="restoreDefaultBtn">Restore example checklist</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ---------------- Storage (localStorage for checklist state/notes; both work standalone in Safari) ---------------- */
 const storage = {
@@ -281,7 +348,7 @@ async function photoDbDelete(id){
 }
 
 /* ---------------- Data ---------------- */
-const DATA = {
+const DEFAULT_DATA = {
   floor1: {
     label: "1st Floor",
     rooms: [
@@ -447,7 +514,10 @@ const DATA = {
   }
 };
 
-const FLOOR_ORDER = ["floor1","floor2","general"];
+const DEFAULT_FLOOR_ORDER = ["floor1","floor2","general"];
+let DATA = DEFAULT_DATA;
+let FLOOR_ORDER = DEFAULT_FLOOR_ORDER;
+let DATA_ORIGIN = 'default'; // 'default' or 'imported'
 
 /* ---------------- State ---------------- */
 // state.items[itemId] = { checked:bool, flagged:bool, note:string }
@@ -572,6 +642,126 @@ async function loadCustomItems(){
   }
 }
 
+/* ---------------- Imported floorplan checklist ---------------- */
+function validateFloorplanJson(parsed){
+  if(!parsed || !Array.isArray(parsed.floors) || parsed.floors.length===0){
+    return 'Missing a non-empty "floors" array.';
+  }
+  const seenRoomIds = new Set();
+  for(const floor of parsed.floors){
+    if(!floor.key || typeof floor.key !== 'string') return 'Each floor needs a "key" string (e.g. "floor1").';
+    if(!floor.label || typeof floor.label !== 'string') return 'Each floor needs a "label" string (e.g. "1st Floor").';
+    if(!Array.isArray(floor.rooms) || floor.rooms.length===0) return `Floor "${floor.label}" needs a non-empty "rooms" array.`;
+    for(const room of floor.rooms){
+      if(!room.id || typeof room.id !== 'string') return 'Each room needs an "id" string.';
+      if(seenRoomIds.has(room.id)) return `Duplicate room id "${room.id}" — room ids must be unique across the whole house.`;
+      seenRoomIds.add(room.id);
+      if(!room.name || typeof room.name !== 'string') return 'Each room needs a "name" string.';
+      if(!Array.isArray(room.items) || room.items.length===0) return `Room "${room.name}" needs a non-empty "items" array of strings.`;
+      if(room.items.some(it=>typeof it !== 'string')) return `Room "${room.name}"'s items must all be plain strings.`;
+    }
+  }
+  return null;
+}
+
+function buildDataFromFloorplanJson(parsed){
+  const newData = {};
+  const newFloorOrder = [];
+  parsed.floors.forEach(floor=>{
+    newFloorOrder.push(floor.key);
+    newData[floor.key] = {
+      label: floor.label,
+      rooms: floor.rooms.map(r=>({
+        id: r.id,
+        name: r.name,
+        dims: r.dims || null,
+        allowCustom: true,
+        items: r.items.slice()
+      }))
+    };
+  });
+  return { data: newData, floorOrder: newFloorOrder };
+}
+
+function saveCustomData(){
+  storage.set('walkthrough-custom-data', JSON.stringify({ data: DATA, floorOrder: FLOOR_ORDER }));
+}
+async function loadCustomData(){
+  try{
+    const res = await storage.get('walkthrough-custom-data');
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      if(parsed && parsed.data && Array.isArray(parsed.floorOrder)){
+        DATA = parsed.data;
+        FLOOR_ORDER = parsed.floorOrder;
+        DATA_ORIGIN = 'imported';
+        activeTab = FLOOR_ORDER[0];
+      }
+    }
+  }catch(e){
+    // no custom data yet
+  }
+}
+
+async function clearCurrentPassPhotos(){
+  const photoIds = new Set();
+  Object.values(state.items).forEach(e=>{ if(e.photoIds) e.photoIds.forEach(id=>photoIds.add(id)); });
+  await Promise.all([...photoIds].map(async pid=>{
+    const url = photoCache[pid];
+    delete photoCache[pid];
+    if(url) URL.revokeObjectURL(url);
+    try{ await photoDbDelete(pid); }catch(e){ /* already gone */ }
+  }));
+}
+
+async function importFloorplanJson(raw){
+  let parsed;
+  try{
+    parsed = JSON.parse(raw);
+  }catch(e){
+    return { status:'error', message: "That isn't valid JSON — check for missing commas/brackets and try again." };
+  }
+  const error = validateFloorplanJson(parsed);
+  if(error) return { status:'error', message: error };
+  if(!confirm('Importing this floorplan will replace your current room list and clear your in-progress checklist (saved History entries are kept). Continue?')){
+    return { status:'cancelled' };
+  }
+  const { data, floorOrder } = buildDataFromFloorplanJson(parsed);
+  await clearCurrentPassPhotos();
+  DATA = data;
+  FLOOR_ORDER = floorOrder;
+  DATA_ORIGIN = 'imported';
+  saveCustomData();
+  state = { items: {} };
+  scheduleSave();
+  customItems = {};
+  saveCustomItems();
+  openRooms = new Set();
+  if(FLOOR_ORDER.length && DATA[FLOOR_ORDER[0]].rooms.length) openRooms.add(DATA[FLOOR_ORDER[0]].rooms[0].id);
+  activeTab = FLOOR_ORDER[0];
+  renderAll();
+  showToast('Floorplan imported');
+  return { status:'ok' };
+}
+
+async function restoreDefaultChecklist(){
+  if(!confirm('Switch back to the example checklist? Your current room list and in-progress checklist will be cleared (saved History entries are kept).')) return;
+  await clearCurrentPassPhotos();
+  DATA = DEFAULT_DATA;
+  FLOOR_ORDER = DEFAULT_FLOOR_ORDER;
+  DATA_ORIGIN = 'default';
+  await storage.delete('walkthrough-custom-data');
+  state = { items: {} };
+  scheduleSave();
+  customItems = {};
+  saveCustomItems();
+  openRooms = new Set();
+  if(FLOOR_ORDER.length && DATA[FLOOR_ORDER[0]].rooms.length) openRooms.add(DATA[FLOOR_ORDER[0]].rooms[0].id);
+  activeTab = FLOOR_ORDER[0];
+  renderAll();
+  showToast('Restored example checklist');
+}
+
 function addCustomItem(roomId){
   const text = prompt('Add a checklist item:');
   if(!text || !text.trim()) return;
@@ -694,6 +884,53 @@ document.getElementById('helpBtn').onclick = ()=>openModal('introModal');
 document.getElementById('prepBtn').onclick = ()=>openModal('prepModal');
 document.getElementById('prepDoneBtn').onclick = ()=>closeModal('prepModal');
 document.getElementById('editInfoBtn').onclick = openInfoModal;
+
+document.getElementById('importBtn').onclick = ()=>{
+  document.getElementById('importError').hidden = true;
+  document.getElementById('importJsonInput').value = '';
+  document.getElementById('importStatusLine').textContent = DATA_ORIGIN==='imported'
+    ? 'Currently using: your imported floorplan.'
+    : 'Currently using: the example checklist.';
+  document.getElementById('restoreDefaultRow').hidden = DATA_ORIGIN !== 'imported';
+  openModal('importModal');
+};
+document.getElementById('copyPromptBtn').onclick = ()=>{
+  const text = document.getElementById('importPromptText').textContent;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>showToast('Prompt copied')).catch(()=>showToast('Could not copy'));
+  }
+};
+document.getElementById('importFileInput').addEventListener('change', (ev)=>{
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ document.getElementById('importJsonInput').value = reader.result; };
+  reader.readAsText(file);
+  ev.target.value = '';
+});
+document.getElementById('importCancelBtn').onclick = ()=>closeModal('importModal');
+document.getElementById('importApplyBtn').onclick = async ()=>{
+  const raw = document.getElementById('importJsonInput').value.trim();
+  const errBox = document.getElementById('importError');
+  if(!raw){
+    errBox.textContent = 'Paste the JSON first.';
+    errBox.hidden = false;
+    return;
+  }
+  const result = await importFloorplanJson(raw);
+  if(result.status === 'error'){
+    errBox.textContent = result.message;
+    errBox.hidden = false;
+    return;
+  }
+  if(result.status === 'cancelled') return;
+  errBox.hidden = true;
+  closeModal('importModal');
+};
+document.getElementById('restoreDefaultBtn').onclick = async ()=>{
+  await restoreDefaultChecklist();
+  closeModal('importModal');
+};
 document.getElementById('introDoneBtn').onclick = ()=>{
   closeModal('introModal');
   storage.set('walkthrough-intro-seen', '1');
@@ -1037,7 +1274,7 @@ function saveAndStartNew(){
   saveArchives();
   state = { items: {} };
   scheduleSave();
-  activeTab = 'floor1';
+  activeTab = FLOOR_ORDER[0];
   showToast('Walkthrough saved');
   renderAll();
 }
@@ -1121,6 +1358,7 @@ document.addEventListener('keydown', (ev)=>{
     closeModal('introModal');
     closeModal('infoModal');
     closeModal('prepModal');
+    closeModal('importModal');
   }
 });
 
@@ -1140,13 +1378,14 @@ document.addEventListener('input', (ev)=>{
 /* ---------------- Init ---------------- */
 (async function init(){
   try{
+    await loadCustomData();
     await loadState();
     await loadArchives();
     await loadAppInfo();
     await loadCustomItems();
     await loadAllPhotos();
     renderHeader();
-    if(DATA.floor1.rooms.length) openRooms.add(DATA.floor1.rooms[0].id);
+    if(FLOOR_ORDER.length && DATA[FLOOR_ORDER[0]].rooms.length) openRooms.add(DATA[FLOOR_ORDER[0]].rooms[0].id);
     renderAll();
     const seenIntro = await storage.get('walkthrough-intro-seen');
     if(!seenIntro || !seenIntro.value){
