@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>New Home Walkthrough</title>
+<script>
+(function(){
+  try{
+    var t = localStorage.getItem('walkthrough-theme');
+    if(t==='dark' || t==='light') document.documentElement.setAttribute('data-theme', t);
+  }catch(e){}
+})();
+</script>
 <style>
   :root{
     --ink:#0F2A45;
@@ -19,8 +27,39 @@
     --flag-bg:#FBEAE0;
     --done:#2F7A57;
     --done-bg:#E7F2EC;
+    --input-bg:#FFFFFF;
     --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Consolas", monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#E7EEF5;
+      --ink-soft:#93A9BE;
+      --surface:#0B1622;
+      --card:#142234;
+      --line:#2A3E52;
+      --line-soft:#1E2E3F;
+      --cyan:#5FBBDA;
+      --flag:#E58A55;
+      --flag-bg:#3A2418;
+      --done:#4CD98A;
+      --done-bg:#163628;
+      --input-bg:#0F1E2E;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#E7EEF5;
+    --ink-soft:#93A9BE;
+    --surface:#0B1622;
+    --card:#142234;
+    --line:#2A3E52;
+    --line-soft:#1E2E3F;
+    --cyan:#5FBBDA;
+    --flag:#E58A55;
+    --flag-bg:#3A2418;
+    --done:#4CD98A;
+    --done-bg:#163628;
+    --input-bg:#0F1E2E;
   }
   *{box-sizing:border-box;}
   html{height:100%;}
@@ -67,7 +106,7 @@
   .room.open .items{max-height:3000px;}
   .item{border-top:1px solid var(--line-soft);padding:12px 16px;}
   .item-row{display:flex;align-items:flex-start;gap:12px;}
-  .check{width:23px;height:23px;border-radius:6px;border:2px solid var(--line);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff;}
+  .check{width:23px;height:23px;border-radius:6px;border:2px solid var(--line);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--input-bg);}
   .check svg{width:13px;height:13px;opacity:0;stroke:#fff;stroke-width:3;fill:none;}
   .check.checked{background:var(--done);border-color:var(--done);}
   .check.checked svg{opacity:1;}
@@ -86,7 +125,7 @@
   .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;}
   .lightbox-close{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:20px;line-height:1;cursor:pointer;}
   .photo-remove{position:absolute;top:2px;right:2px;background:rgba(15,42,69,.75);color:#fff;border:none;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer;padding:0;}
-  .add-photo-btn{width:64px;height:64px;border:1.5px dashed var(--flag);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--flag);font-size:24px;cursor:pointer;background:#fff;flex-shrink:0;}
+  .add-photo-btn{width:64px;height:64px;border:1.5px dashed var(--flag);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--flag);font-size:24px;cursor:pointer;background:var(--input-bg);flex-shrink:0;}
   .add-photo-btn input{display:none;}
   .photo-uploading{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-soft);text-align:center;flex-shrink:0;}
   .item.flagged{background:var(--flag-bg);margin:0 -16px;padding:12px 16px;}
@@ -107,7 +146,7 @@
   .copybar button{flex:1;border:none;border-radius:9px;padding:13px;font-size:14.5px;font-weight:700;font-family:var(--sans);cursor:pointer;}
   .copybar .copy{background:var(--cyan);color:var(--navy-deep);}
   .copybar .reset{background:rgba(255,255,255,.12);color:#fff;flex:0 0 auto;padding:13px 16px;}
-  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--navy-deep);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;}
   .toast.show{opacity:1;}
 
   .floor-empty-pad{height:6px;}
@@ -122,6 +161,13 @@
   .header-menu-close{background:rgba(255,255,255,.14);border:none;color:#fff;border-radius:7px;width:36px;height:36px;font-size:20px;line-height:1;cursor:pointer;}
   .header-menu button.menu-item{background:none;border:none;border-bottom:1px solid rgba(255,255,255,.12);color:#fff;text-align:left;padding:18px 6px;font-family:var(--sans);font-size:17px;font-weight:600;cursor:pointer;}
   .header-menu button.menu-item:active{background:rgba(255,255,255,.08);}
+  .menu-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:18px 6px;border-bottom:1px solid rgba(255,255,255,.12);color:#fff;font-family:var(--sans);font-size:17px;font-weight:600;}
+  .switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;position:absolute;}
+  .switch-slider{position:absolute;inset:0;background:rgba(255,255,255,.25);border-radius:26px;cursor:pointer;transition:.2s;}
+  .switch-slider::before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+  .switch input:checked + .switch-slider{background:var(--cyan);}
+  .switch input:checked + .switch-slider::before{transform:translateX(20px);}
   @media (max-width: 480px){
     .head-top-actions{display:none;}
     .header-btn.menu-btn{display:flex;}
@@ -137,12 +183,12 @@
   .modal-card ul{margin:0 0 4px;padding-left:20px;font-size:13.5px;color:var(--ink-soft);line-height:1.65;}
   .modal-card ul li{margin-bottom:6px;}
   .modal-card label{display:block;font-size:12.5px;font-weight:600;color:var(--ink);margin:14px 0 5px;}
-  .modal-card input[type=text]{width:100%;border:1.5px solid var(--line-soft);border-radius:7px;padding:9px 11px;font-family:var(--sans);font-size:14px;color:var(--ink);background:#fff;}
+  .modal-card input[type=text]{width:100%;border:1.5px solid var(--line-soft);border-radius:7px;padding:9px 11px;font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--input-bg);}
   .modal-actions{display:flex;gap:10px;margin-top:20px;}
   .modal-actions button{flex:1;border:none;border-radius:9px;padding:12px;font-size:14.5px;font-weight:700;font-family:var(--sans);cursor:pointer;}
   .modal-actions .primary{background:var(--cyan);color:var(--navy-deep);}
   .modal-actions .secondary{background:var(--surface);color:var(--ink-soft);}
-  .modal-card textarea{width:100%;border:1.5px solid var(--line-soft);border-radius:7px;padding:9px 11px;font-family:var(--mono);font-size:12px;color:var(--ink);background:#fff;resize:vertical;min-height:100px;}
+  .modal-card textarea{width:100%;border:1.5px solid var(--line-soft);border-radius:7px;padding:9px 11px;font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--input-bg);resize:vertical;min-height:100px;}
   .prompt-box{background:var(--surface);border:1px solid var(--line-soft);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.5;white-space:pre-wrap;color:var(--ink);max-height:220px;overflow-y:auto;margin:0 0 10px;}
   .import-error{color:var(--flag);font-size:12.5px;margin-top:10px;}
   .file-choose-btn{display:block;width:100%;text-align:center;margin-bottom:10px;box-sizing:border-box;}
@@ -172,6 +218,13 @@
   <div class="header-menu" id="headerMenu">
     <div class="header-menu-top">
       <button class="header-menu-close" data-action="toggleMenu" aria-label="Close menu">&times;</button>
+    </div>
+    <div class="menu-toggle-row">
+      <span>Dark mode</span>
+      <label class="switch">
+        <input type="checkbox" id="darkModeToggle">
+        <span class="switch-slider"></span>
+      </label>
     </div>
     <button class="menu-item" data-action="menuHelp">How this works</button>
     <button class="menu-item" data-action="menuPrep">What to bring</button>
@@ -866,6 +919,21 @@ function closeLightbox(){
   document.getElementById('lightboxImg').src = '';
 }
 
+function isDarkActive(){
+  const explicit = document.documentElement.getAttribute('data-theme');
+  if(explicit === 'dark') return true;
+  if(explicit === 'light') return false;
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+function syncDarkToggle(){
+  document.getElementById('darkModeToggle').checked = isDarkActive();
+}
+document.getElementById('darkModeToggle').addEventListener('change', (ev)=>{
+  const theme = ev.target.checked ? 'dark' : 'light';
+  try{ localStorage.setItem('walkthrough-theme', theme); }catch(e){ /* ignore */ }
+  document.documentElement.setAttribute('data-theme', theme);
+});
+
 function openModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){
   document.getElementById(id).classList.remove('show');
@@ -1460,7 +1528,9 @@ document.addEventListener('click', (ev)=>{
   } else if(action==='closeLightbox'){
     closeLightbox();
   } else if(action==='toggleMenu'){
-    document.getElementById('headerMenu').classList.toggle('show');
+    const menu = document.getElementById('headerMenu');
+    menu.classList.toggle('show');
+    if(menu.classList.contains('show')) syncDarkToggle();
   } else if(action==='menuHelp'){
     document.getElementById('headerMenu').classList.remove('show');
     startTour();
