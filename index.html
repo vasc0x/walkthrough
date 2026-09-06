@@ -925,6 +925,9 @@ document.getElementById('importFileInput').addEventListener('change', (ev)=>{
   ev.target.value = '';
 });
 document.getElementById('importCancelBtn').onclick = ()=>closeModal('importModal');
+document.getElementById('importModal').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'importModal') closeModal('importModal');
+});
 document.getElementById('importApplyBtn').onclick = async ()=>{
   const raw = document.getElementById('importJsonInput').value.trim();
   const errBox = document.getElementById('importError');
