@@ -52,6 +52,7 @@
   .room-head .titles{min-width:0;}
   .room-head h2{font-size:15.5px;margin:0;font-weight:700;}
   .room-head .dims{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .archive-summary{font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);margin-top:4px;}
   .room-head .rprog{font-family:var(--mono);font-size:12px;color:var(--ink-soft);flex-shrink:0;display:flex;align-items:center;gap:8px;}
   .room-head .rprog .chip{background:var(--surface);border:1px solid var(--line-soft);border-radius:20px;padding:3px 9px;}
   .room-head .rprog .chip.complete{background:var(--done-bg);color:var(--done);border-color:transparent;}
@@ -933,14 +934,18 @@ function renderHistory(){
       }).join('');
     }
 
+    const fixingText = flaggedEntries.length
+      ? `<span style="color:var(--flag);font-weight:600;">${flaggedEntries.length} need${flaggedEntries.length===1?'s':''} fixing</span>`
+      : `<span style="color:var(--done);font-weight:600;">nothing flagged</span>`;
+
     return `<div class="room ${open?'open':''}" data-room="${a.id}">
       <div class="room-head" data-action="toggleArchive" data-archive="${a.id}">
         <div class="titles">
           <h2>${a.label}</h2>
-          <div class="dims">${dateStr} · ${flaggedEntries.length} flagged</div>
+          <div class="dims">${dateStr}</div>
+          <div class="archive-summary">${done}/${total} features inspected. ${fixingText}</div>
         </div>
         <div class="rprog">
-          <span class="chip">${done}/${total}</span>
           <button class="archive-delete" data-action="deleteArchive" data-archive="${a.id}" aria-label="Delete walkthrough">&#128465;</button>
           <span class="chevron"></span>
         </div>
