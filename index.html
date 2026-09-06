@@ -89,6 +89,9 @@
   .add-photo-btn input{display:none;}
   .photo-uploading{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-soft);text-align:center;flex-shrink:0;}
   .item.flagged{background:var(--flag-bg);margin:0 -16px;padding:12px 16px;}
+  .item-delete{flex-shrink:0;background:none;border:1.5px solid var(--line-soft);color:var(--ink-soft);border-radius:7px;width:32px;height:32px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .add-item-row{padding:10px 16px;}
+  .add-item-btn{width:100%;background:none;border:1.5px dashed var(--line);color:var(--ink-soft);border-radius:8px;padding:10px;font-family:var(--sans);font-size:13.5px;font-weight:600;cursor:pointer;}
 
   /* ---------- Punch list ---------- */
   .punch-empty{text-align:center;color:var(--ink-soft);padding:60px 20px;font-size:14.5px;}
@@ -382,7 +385,7 @@ const DATA = {
   general: {
     label: "General",
     rooms: [
-      { id:"wholehouse", name:"Whole-House & Exterior", dims:null, items:[
+      { id:"wholehouse", name:"Whole-House & Exterior", dims:null, allowCustom:true, items:[
         "Exterior walls/stucco free of cracks",
         "Roofline and gutters/downspouts are in good condition",
         "Grading slopes away from the foundation on all sides",
@@ -414,8 +417,22 @@ let activeTab = "floor1";
 let openRooms = new Set();
 let openArchives = new Set();
 let appInfo = { ownerName:'', builder:'', address:'' };
+let customItems = {}; // { roomId: [{id, text}, ...] }
 
 function itemId(roomId, idx){ return roomId + "::" + idx; }
+function customItemId(roomId, customId){ return roomId + "::custom:" + customId; }
+function getCustomItems(roomId){ return customItems[roomId] || []; }
+
+function resolveItemText(id){
+  const [roomId, rest] = id.split('::');
+  const room = findRoomById(roomId);
+  if(rest && rest.startsWith('custom:')){
+    const c = getCustomItems(roomId).find(ci=>ci.id===rest.slice(7));
+    return c ? c.text : null;
+  }
+  const idx = parseInt(rest, 10);
+  return (room && room.items[idx] !== undefined) ? room.items[idx] : null;
+}
 
 function allItemsFlat(){
   const out = [];
@@ -424,6 +441,11 @@ function allItemsFlat(){
       r.items.forEach((text, idx)=>{
         out.push({ floorKey:fk, room:r, idx, id:itemId(r.id, idx), text });
       });
+      if(r.allowCustom){
+        getCustomItems(r.id).forEach(c=>{
+          out.push({ floorKey:fk, room:r, idx:null, id:customItemId(r.id, c.id), text:c.text, custom:true });
+        });
+      }
     });
   });
   return out;
@@ -490,6 +512,50 @@ async function loadAppInfo(){
   }catch(e){
     // no saved info yet
   }
+}
+
+function saveCustomItems(){
+  storage.set('walkthrough-custom-items', JSON.stringify(customItems));
+}
+async function loadCustomItems(){
+  try{
+    const res = await storage.get('walkthrough-custom-items');
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      if(parsed) customItems = parsed;
+    }
+  }catch(e){
+    // no custom items yet
+  }
+}
+
+function addCustomItem(roomId){
+  const text = prompt('Add a checklist item:');
+  if(!text || !text.trim()) return;
+  if(!customItems[roomId]) customItems[roomId] = [];
+  customItems[roomId].push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2,6), text: text.trim() });
+  saveCustomItems();
+  renderAll();
+}
+
+async function deleteCustomItem(roomId, customId){
+  const list = customItems[roomId] || [];
+  const item = list.find(c=>c.id===customId);
+  if(!item) return;
+  if(!confirm(`Remove "${item.text}" from the checklist?`)) return;
+  customItems[roomId] = list.filter(c=>c.id!==customId);
+  saveCustomItems();
+  const id = customItemId(roomId, customId);
+  const photoIds = getEntry(id).photoIds || [];
+  await Promise.all(photoIds.map(async pid=>{
+    const url = photoCache[pid];
+    delete photoCache[pid];
+    if(url) URL.revokeObjectURL(url);
+    try{ await photoDbDelete(pid); }catch(e){ /* already gone */ }
+  }));
+  delete state.items[id];
+  scheduleSave();
+  renderAll();
 }
 
 async function loadAllPhotos(){
@@ -606,7 +672,13 @@ function showToast(msg){
 function roomCounts(room){
   let done=0;
   room.items.forEach((_,idx)=>{ if(getEntry(itemId(room.id,idx)).checked) done++; });
-  return { done, total: room.items.length };
+  let total = room.items.length;
+  if(room.allowCustom){
+    const customs = getCustomItems(room.id);
+    total += customs.length;
+    customs.forEach(c=>{ if(getEntry(customItemId(room.id,c.id)).checked) done++; });
+  }
+  return { done, total };
 }
 
 function overallCounts(){
@@ -671,8 +743,8 @@ function renderOverall(){
   document.getElementById('overallBar').style.width = pct + '%';
 }
 
-function itemRowHtml(room, idx, text){
-  const id = itemId(room.id, idx);
+function itemRowHtml(id, text, opts){
+  opts = opts || {};
   const e = getEntry(id);
   return `
   <div class="item ${e.checked?'checked':''} ${e.flagged?'flagged':''}" data-id="${id}">
@@ -681,6 +753,7 @@ function itemRowHtml(room, idx, text){
         <svg viewBox="0 0 24 24"><polyline points="4,13 9,18 20,6"/></svg>
       </div>
       <div class="item-text">${text}</div>
+      ${opts.custom ? `<button class="item-delete" data-action="deleteCustomItem" data-room="${opts.roomId}" data-custom="${opts.customId}" aria-label="Remove item">&#128465;</button>` : ''}
       <button class="flagbtn ${e.flagged?'on':''}" data-action="flag" data-id="${id}" aria-label="Flag issue">&#9873;</button>
     </div>
     ${e.flagged ? `<div class="note-wrap">
@@ -717,7 +790,9 @@ function roomHtml(room){
       </div>
     </div>
     <div class="items">
-      ${room.items.map((text,idx)=>itemRowHtml(room, idx, text)).join('')}
+      ${room.items.map((text,idx)=>itemRowHtml(itemId(room.id,idx), text, {})).join('')}
+      ${room.allowCustom ? getCustomItems(room.id).map(c=>itemRowHtml(customItemId(room.id,c.id), c.text, {custom:true, customId:c.id, roomId:room.id})).join('') : ''}
+      ${room.allowCustom ? `<div class="add-item-row"><button class="add-item-btn" data-action="addCustomItem" data-room="${room.id}">+ Add a checklist item</button></div>` : ''}
     </div>
   </div>`;
 }
@@ -777,12 +852,16 @@ function renderHistory(){
     const byRoom = {};
     flaggedEntries.forEach(([id,e])=>{
       const [roomId, idxStr] = id.split('::');
-      const idx = parseInt(idxStr, 10);
       const found = findFloorAndRoom(roomId);
       const room = found ? found.room : null;
       const label = found ? `${DATA[found.floorKey].label} — ${room.name}` : roomId;
+      let text = e.text;
+      if(text === undefined){
+        const idx = parseInt(idxStr, 10);
+        text = room ? room.items[idx] : id;
+      }
       if(!byRoom[roomId]) byRoom[roomId] = { label, items: [] };
-      byRoom[roomId].items.push({ id, e, text: room ? room.items[idx] : id });
+      byRoom[roomId].items.push({ id, e, text });
     });
 
     let inner;
@@ -888,11 +967,16 @@ function saveAndStartNew(){
   const label = prompt('Save this walkthrough as:', defaultLabel);
   if(label===null) return;
   if(!confirm(`Save "${label || defaultLabel}" (${done}/${total} checked, ${flaggedCount} flagged) and start a new checklist?`)) return;
+  const archivedItems = {};
+  Object.keys(state.items).forEach(id=>{
+    const text = resolveItemText(id);
+    archivedItems[id] = Object.assign({}, state.items[id], text ? { text } : {});
+  });
   archives.unshift({
     id: 'a' + Date.now(),
     label: label || defaultLabel,
     savedAt: new Date().toISOString(),
-    items: JSON.parse(JSON.stringify(state.items))
+    items: archivedItems
   });
   saveArchives();
   state = { items: {} };
@@ -961,6 +1045,10 @@ document.addEventListener('click', (ev)=>{
     renderAll();
   } else if(action==='deleteArchive'){
     deleteArchive(t.dataset.archive);
+  } else if(action==='addCustomItem'){
+    addCustomItem(t.dataset.room);
+  } else if(action==='deleteCustomItem'){
+    deleteCustomItem(t.dataset.room, t.dataset.custom);
   } else if(action==='resetAll'){
     ev.preventDefault();
     resetAll();
@@ -998,6 +1086,7 @@ document.addEventListener('input', (ev)=>{
     await loadState();
     await loadArchives();
     await loadAppInfo();
+    await loadCustomItems();
     await loadAllPhotos();
     renderHeader();
     if(DATA.floor1.rooms.length) openRooms.add(DATA.floor1.rooms[0].id);
