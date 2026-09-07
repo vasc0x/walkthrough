@@ -588,10 +588,29 @@ const DEFAULT_DATA = {
         "Lennar \"Everything's Included\" spec sheet matches installed items"
       ]}
     ]
+  },
+  questions: {
+    label: "Builder Questions",
+    rooms: [
+      { id:"builderquestions", name:"Ask the Builder", dims:null, allowCustom:true, items:[
+        "What is the warranty on the appliances, and who do I contact for service?",
+        "What is the structural warranty period, and what does it cover?",
+        "What is the workmanship warranty period for drywall, paint, and trim?",
+        "Who is my point of contact for warranty claims after closing?",
+        "Is there a scheduled walkthrough before the warranty expires (e.g., an 11-month inspection)?",
+        "What paint brand and colors were used, and can I get the exact codes for touch-ups?",
+        "Where are the main water shutoff, electrical panel, and gas shutoff located?",
+        "What size/brand is the HVAC system, and how often should filters be replaced?",
+        "Is there an irrigation system, and how do I program it?",
+        "How do I submit a warranty repair request, and what's the expected response time?",
+        "Are there any pending city/county inspections or unfinished items?",
+        "Are the smart home devices (lock, doorbell, thermostat) already registered, or do I need to set up new accounts?"
+      ]}
+    ]
   }
 };
 
-const DEFAULT_FLOOR_ORDER = ["floor1","floor2","general"];
+const DEFAULT_FLOOR_ORDER = ["floor1","floor2","general","questions"];
 let DATA = DEFAULT_DATA;
 let FLOOR_ORDER = DEFAULT_FLOOR_ORDER;
 let DATA_ORIGIN = 'default'; // 'default' or 'imported'
