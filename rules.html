@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Penn Cove rule finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F1F5F5;
+  --surface: #FFFFFF;
+  --ink: #132A31;
+  --muted: #4A6169;
+  --line: #D3DEE0;
+  --brand: #0B5563;
+  --brand-ink: #FFFFFF;
+  --mark: #FFE082;
+  --mark-ink: #132A31;
+  --approve: #4B3FB8; --approve-bg: #ECEAFB;
+  --ban: #B3261E;     --ban-bg: #FCEAE8;
+  --must: #0B5563;    --must-bg: #E1F1F3;
+  --info: #56686E;    --info-bg: #E9EFF0;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1C20; --surface: #15272D; --ink: #E6F0F2; --muted: #9DB3B9; --line: #27404A;
+    --brand: #5CC2D4; --brand-ink: #0E1C20; --mark: #6B5A12; --mark-ink: #FFF3C4;
+    --approve: #BDB6FF; --approve-bg: #262247;
+    --ban: #FFB4AB;     --ban-bg: #40201D;
+    --must: #8ED8E6;    --must-bg: #123640;
+    --info: #B4C4C9;    --info-bg: #22343A;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1C20; --surface: #15272D; --ink: #E6F0F2; --muted: #9DB3B9; --line: #27404A;
+  --brand: #5CC2D4; --brand-ink: #0E1C20; --mark: #6B5A12; --mark-ink: #FFF3C4;
+  --approve: #BDB6FF; --approve-bg: #262247;
+  --ban: #FFB4AB;     --ban-bg: #40201D;
+  --must: #8ED8E6;    --must-bg: #123640;
+  --info: #B4C4C9;    --info-bg: #22343A;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 80px); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+header.top { padding: 28px 0 16px; }
+.back-link { display: inline-block; font: 600 14px/1 var(--body); color: var(--muted); text-decoration: none; margin-bottom: 10px; }
+.back-link:hover { color: var(--brand); }
+h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 8vw, 44px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+.lede { margin: 0; color: var(--muted); }
+
+.searchbar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: var(--bg);
+  padding: 8px 0 10px;
+}
+.field { position: relative; }
+.field input {
+  width: 100%;
+  height: 56px;
+  padding: 0 52px 0 18px;
+  font: 500 18px/1 var(--body);
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--brand);
+  border-radius: 14px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.field input::placeholder { color: var(--muted); font-weight: 400; }
+.field input:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 25%, transparent); }
+.clear {
+  position: absolute; right: 6px; top: 6px;
+  width: 44px; height: 44px;
+  border: 0; border-radius: 10px;
+  background: transparent; color: var(--muted);
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.clear[hidden] { display: none; }
+.clear:focus-visible { outline: 3px solid var(--brand); }
+
+.row { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.row::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto;
+  font: 500 14px/1 var(--body);
+  min-height: 40px;
+  padding: 0 14px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.chip:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.chip .n { opacity: .7; margin-left: 6px; font-variant-numeric: tabular-nums; }
+
+.controls { padding-top: 6px; }
+.label { font-size: 13px; color: var(--muted); margin: 10px 0 2px; }
+
+.try { margin: 14px 0 4px; }
+.try .row { flex-wrap: wrap; overflow: visible; }
+.try .chip { min-height: 44px; font-size: 15px; }
+
+.status { margin: 14px 0 6px; font-size: 14px; color: var(--muted); min-height: 21px; }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.rule {
+  background: var(--surface);
+  border-left: 5px solid var(--info);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 16px 14px 16px;
+}
+.rule:first-child { border-top-left-radius: 10px; border-top-right-radius: 10px; }
+.rule:last-child { border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; border-bottom: 0; }
+.rule[data-t="approve"] { border-left-color: var(--approve); }
+.rule[data-t="ban"] { border-left-color: var(--ban); }
+.rule[data-t="must"] { border-left-color: var(--must); }
+.rule h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+.tag {
+  display: inline-block;
+  font: 600 12.5px/1 var(--body);
+  padding: 5px 9px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  color: var(--info); background: var(--info-bg);
+}
+.rule[data-t="approve"] .tag { color: var(--approve); background: var(--approve-bg); }
+.rule[data-t="ban"] .tag { color: var(--ban); background: var(--ban-bg); }
+.rule[data-t="must"] .tag { color: var(--must); background: var(--must-bg); }
+.rule p { margin: 0 0 8px; }
+details { margin: 4px 0 8px; }
+details summary {
+  cursor: pointer; font-weight: 600; font-size: 15px; color: var(--brand);
+  min-height: 32px; display: flex; align-items: center;
+}
+details summary:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+details ul { margin: 6px 0 4px; padding-left: 20px; }
+details li { margin: 4px 0; }
+.sec { font-size: 13px; color: var(--muted); margin: 0; }
+mark { background: var(--mark); color: var(--mark-ink); border-radius: 3px; padding: 0 1px; }
+
+.empty {
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 22px 18px;
+}
+.empty h2 { font-family: var(--display); font-size: 20px; margin: 0 0 6px; }
+.empty p { margin: 0 0 12px; color: var(--muted); }
+.btn {
+  font: 600 15px/1 var(--body); min-height: 44px; padding: 0 16px;
+  background: var(--brand); color: var(--brand-ink);
+  border: 0; border-radius: 10px; cursor: pointer;
+}
+.btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+footer { padding: 26px 0 40px; color: var(--muted); font-size: 13.5px; }
+footer p { margin: 0 0 8px; }
+
+
+/* tabs */
+.tabs { display: flex; gap: 6px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin: 2px 0 10px; }
+.tab { flex: 1; min-height: 48px; font: 600 16px/1 var(--body); border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--brand); color: var(--brand-ink); }
+.tab:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+/* write view */
+.lede2 { margin: 6px 0 16px; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 0 0 12px; }
+.panel h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.fl { display: block; font-weight: 600; font-size: 15px; margin: 14px 0 4px; }
+.fl.first { margin-top: 0; }
+.panel select, .panel input[type="text"], .panel textarea {
+  width: 100%; font: 400 16px/1.4 var(--body); color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+}
+.panel select { min-height: 48px; }
+.panel textarea { resize: vertical; min-height: 88px; }
+.panel select:focus-visible, .panel input[type="text"]:focus-visible, .panel textarea:focus-visible { outline: 3px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+.hint { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; min-height: 44px; cursor: pointer; }
+.check input { width: 22px; height: 22px; margin-top: 1px; accent-color: var(--brand); flex: 0 0 auto; }
+#wme summary { font-family: var(--display); font-weight: 600; font-size: 18px; color: var(--ink); min-height: 32px; }
+#wme[open] summary { margin-bottom: 2px; }
+.subj { margin: 6px 0 10px; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.subj #wsubject { color: var(--ink); font-weight: 600; }
+.preview {
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px; font-size: 15.5px; line-height: 1.55;
+  -webkit-user-select: text; user-select: text;
+}
+.preview:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.preview mark { padding: 0 2px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.btn.ghost { background: transparent; color: var(--brand); border: 2px solid var(--brand); }
+.linkbtn { font: 600 14px/1 var(--body); min-height: 44px; padding: 0; background: none; border: 0; color: var(--brand); text-decoration: underline; cursor: pointer; }
+.draft {
+  font: 600 15px/1 var(--body); min-height: 44px; padding: 0 16px; margin: 2px 0 10px;
+  background: transparent; color: var(--brand); border: 2px solid var(--brand); border-radius: 10px; cursor: pointer;
+}
+.draft:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+
+@media print {
+  :root { padding: 0; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .tabs, .searchbar, .controls, .try, .status, .draft, .actions, .linkbtn, .hint, #wattach-panel, #wme, #wfields, #whint, .lede, .lede2, header.top, footer p:nth-child(2) { display: none !important; }
+  #view-write > .panel { border: 0; padding: 0; margin: 0; }
+  #view-write > .panel:first-of-type, #view-write > .panel:nth-of-type(2) { display: none; }
+  .preview { border: 0; padding: 0; font-size: 11.5pt; }
+  .preview mark { background: none; }
+  .rule { break-inside: avoid; border-left-width: 3px; }
+  details:not([open]) > *:not(summary) { display: block; }
+}
+@media (min-width: 640px) {
+  .rule { padding: 18px 22px 16px 20px; }
+  .rule h3 { font-size: 21px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a href="index.html" class="back-link">&larr; Dashboard</a>
+    <h1>Penn Cove Rule Finder</h1>
+    <p class="lede">Search the recorded HOA declaration in plain language, or draft the letters it requires. Each result shows the section it comes from.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab-find" class="tab" aria-selected="true" aria-controls="view-find">Find a rule</button>
+    <button type="button" role="tab" id="tab-write" class="tab" aria-selected="false" aria-controls="view-write">Write a request</button>
+  </div>
+
+  <div id="view-find" role="tabpanel" aria-labelledby="tab-find">
+  <div class="searchbar">
+    <div class="field">
+      <label for="q" class="sr" style="position:absolute;left:-9999px">Search the rules</label>
+      <input id="q" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search: lights, fence, dog, rent…">
+      <button class="clear" id="clear" type="button" aria-label="Clear search" hidden>&times;</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="row" id="cats" role="group" aria-label="Filter by topic"></div>
+    <div class="row" id="types" role="group" aria-label="Filter by rule type"></div>
+  </div>
+
+  <div class="try" id="try">
+    <div class="label">Common searches</div>
+    <div class="row" id="tryrow"></div>
+  </div>
+
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <ul class="list" id="list"></ul>
+  </div>
+
+  <section id="view-write" role="tabpanel" aria-labelledby="tab-write" hidden>
+    <p class="lede2">Pick what you need, fill in the blanks, and copy the letter into an email. The ACC may also have its own application form and fee, so ask management and attach your letter to it.</p>
+
+    <div class="panel">
+      <label class="fl first" for="wtype">What do you need?</label>
+      <select id="wtype"></select>
+      <p class="hint" id="whint"></p>
+    </div>
+
+    <div class="panel">
+      <h3>Request details</h3>
+      <div id="wfields"></div>
+    </div>
+
+    <div class="panel" id="wattach-panel">
+      <h3>What you're enclosing</h3>
+      <p class="hint">Uncheck anything you don't have. Only checked items appear in the letter.</p>
+      <div id="wattach"></div>
+    </div>
+
+    <details class="panel" id="wme" open>
+      <summary>Your details</summary>
+      <label class="fl first" for="me-name">Your name</label>
+      <input id="me-name" type="text" autocomplete="name">
+      <label class="fl" for="me-addr">Your home address in Penn Cove</label>
+      <input id="me-addr" type="text" autocomplete="street-address">
+      <label class="fl" for="me-email">Email</label>
+      <input id="me-email" type="text" inputmode="email" autocomplete="email" autocapitalize="off">
+      <label class="fl" for="me-phone">Phone</label>
+      <input id="me-phone" type="text" inputmode="tel" autocomplete="tel">
+      <label class="fl" for="me-sendto">Where you're sending it</label>
+      <input id="me-sendto" type="text" placeholder="Management company name and address, or HOA mailing address">
+      <p class="hint">Saved only in this browser so you don't have to retype them.</p>
+      <button type="button" class="linkbtn" id="wclearme">Clear saved details</button>
+    </details>
+
+    <div class="panel">
+      <h3>Your letter</h3>
+      <div class="status" id="wstatus" role="status" aria-live="polite"></div>
+      <p class="subj"><span>Email subject:</span> <span id="wsubject"></span></p>
+      <div class="preview" id="wpreview" tabindex="0" aria-label="Letter preview"></div>
+      <div class="actions">
+        <button type="button" class="btn" id="wcopy">Copy letter</button>
+        <button type="button" class="btn ghost" id="wcopysub">Copy subject</button>
+        <a class="btn ghost" id="wmailto" href="#" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Open in email app</a>
+        <a class="btn ghost" id="wmailtoShort" href="#" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Open in email (subject only)</a>
+        <button type="button" class="btn ghost" id="wshare" hidden>Share</button>
+      </div>
+      <p class="hint" id="wmsg" role="status" aria-live="polite"></p>
+      <p class="hint">"Open in email app" fills in the subject and body. If "Where you're sending it" above is a valid email address it also fills in the recipient; otherwise add it yourself. If that link fails to open or errors, try "subject only" and paste the letter in by hand.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>A plain-language summary of the recorded Declaration for Penn Cove (Lennar Homes, Miami-Dade County). It was read from a scanned copy, so check anything important against the original document.</p>
+    <p>The Board can adopt separate Rules and Regulations, and fees, fines, and forms change over time. The letters are drafts to review and edit before you send them. This is not legal advice.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var TYPES = { approve: "Needs approval", ban: "Not allowed", must: "Required", info: "Good to know" };
+  var CATS = ["Money", "Maintenance and yard", "Exterior changes", "Vehicles", "Pets", "Conduct and signs", "Leasing and sales", "Enforcement", "Insurance and damage", "Governance"];
+
+  var RULES = [
+    /* Money */
+    { c: "Money", t: "info", title: "Regular dues and special assessments",
+      s: "Every owner pays an equal share of regular dues, special assessments, and reserves. The Board sets a 12-month budget and decides whether dues are collected monthly, quarterly, or annually.",
+      d: ["Owners get written notice at least 10 days before the first installment is due.",
+          "Special assessments cover capital improvements, major repairs, and emergencies.",
+          "Reserves for replacing common-area improvements are optional for the Board.",
+          "Dues can include bulk services the HOA contracts for, such as cable or internet. Optional telecom services are billed only to the owners who use them."],
+      sec: "§18.2, §18.5, §18.10, §23", kw: "dues hoa fee fees monthly quarterly annual budget special assessment reserves cable internet telecom cost" },
+    { c: "Money", t: "must", title: "Late payments",
+      s: "Dues unpaid 15 days after the due date can draw a $25 monthly late fee plus interest at the maximum legal rate. Continued non-payment can lead to a lien and foreclosure.",
+      d: ["The Board can set a higher late fee or a different grace period.",
+          "The HOA can accelerate up to 12 months of assessments after a default.",
+          "You also owe the HOA's collection costs and attorney fees.",
+          "You can't avoid dues by not using the common areas or abandoning the lot.",
+          "If a landlord owner falls behind, the HOA can collect rent directly from the tenant."],
+      sec: "§18.18, §18.19, §14.21", kw: "late fee penalty interest lien foreclosure unpaid delinquent behind pay payment overdue" },
+    { c: "Money", t: "info", title: "Charges billed only to you",
+      s: "Some costs go to individual owners instead of being shared: exterior repainting, party roof work, perimeter wall repairs, and the HOA fixing a violation you left unfixed.",
+      d: ["Villa exterior painting and pressure cleaning are billed to the owner.",
+          "Party roof repairs are billed to the owners of that roof.",
+          "If you don't maintain your home's exterior, the HOA can do the work and bill you plus reasonable administrative costs.",
+          "Common-area repairs caused by an owner's or occupant's negligent or willful acts are billed to that owner.",
+          "Items left in common areas can be removed, with the cost charged to you."],
+      sec: "§18.2.5, §12.6, §12.7, §12.12, §14.29, §14.35", kw: "individual assessment bill billed charge paint painting pressure cleaning roof damage cost extra" },
+    { c: "Money", t: "info", title: "Fees when you buy or sell",
+      s: "The first buyer from the developer pays an initial contribution of up to 3 months of dues at closing. The HOA may also charge a uniform resale contribution on later sales.",
+      d: ["The initial contribution goes to the developer.",
+          "The resale contribution amount is set by the Board and must be the same for every home.",
+          "Sellers must be current on dues and get an estoppel certificate. The HOA must provide it within 10 days of a written request, and you pay a reasonable fee for it."],
+      sec: "§18.11, §18.12, §18.13", kw: "closing buy purchase sell selling estoppel resale contribution transfer fee initial move" },
+
+    /* Maintenance and yard */
+    { c: "Maintenance and yard", t: "info", title: "What the HOA maintains",
+      s: "The HOA maintains the common areas, private roads, drainage, and common-area irrigation and landscaping. It also handles villa exterior repainting and party roofs, billed back to owners.",
+      d: ["The Board decides when repainting or roof work is needed, and picks the paint colors.",
+          "It maintains perimeter wall sections on your lot when the Board sees fit, billed to you. Owners must give access.",
+          "It may also maintain medians and swales on public roads under agreements with the government."],
+      sec: "§12.1, §12.2, §12.5, §12.6, §12.7, §12.8, §12.9", kw: "hoa responsible common areas roads drainage paint painting exterior roof wall walls who maintains repairs" },
+    { c: "Maintenance and yard", t: "info", title: "Front yard care",
+      s: "The HOA mows, edges, and fertilizes front yards, and trims front trees and hedges, only if that's in the budget. If you change the original plant beds, you take over maintaining them.",
+      d: ["Costs are shared equally among all owners as part of dues.",
+          "Fenced or inaccessible front yards are excluded.",
+          "If the Board takes over whole yards, you must give the HOA access. Each time you block access counts as a separate violation.",
+          "Owners replace dead trees, shrubs, and grass, and maintain rear and side yards."],
+      sec: "§12.4", kw: "lawn mow mowing grass trees hedges front yard landscaping plants beds" },
+    { c: "Maintenance and yard", t: "must", title: "Lawn standards where you maintain the yard",
+      s: "Keep grass under 5 inches, edge as needed, weed at every cut, and fertilize at least three times a year (February, June, and October).",
+      d: ["Prune trees and trim shrubs as needed.",
+          "No chemical edging. Chemical weed treatment is allowed.",
+          "Turn mulch four times a year and refresh it yearly.",
+          "Control insects and disease as needed.",
+          "Remove all cuttings and debris the same day.",
+          "The HOA can do the work and bill you if you don't comply."],
+      sec: "§13.1", kw: "grass height mulch fertilize fertilizer weeds weeding edging trim prune yard lawn cut debris" },
+    { c: "Maintenance and yard", t: "must", title: "Irrigation and swales",
+      s: "You water your lawn and the swale between your lot and the road, and maintain any sprinklers on your lot. Watering can be limited to schedules the HOA sets.",
+      d: ["Irrigation water isn't drinkable, and people and pets shouldn't play in it.",
+          "It can stain homes and vehicles. The HOA treats and removes staining.",
+          "You're responsible for damage from irrigation line breaks or leaks on your property."],
+      sec: "§12.5, §13.1.7, §13.3, §14.18", kw: "sprinkler sprinklers watering water swale irrigation stain stains rust" },
+    { c: "Maintenance and yard", t: "must", title: "Driveways and sidewalks",
+      s: "You repair and maintain your driveway and the sidewalk in front of or beside your home, and keep them free of oil stains and weeds.",
+      d: ["This applies even to damage caused by the developer, the HOA, or an easement holder.",
+          "Driveway coatings need ACC approval, and can't extend past the front lot line or onto the sidewalk."],
+      sec: "§13.2.6, §14.29", kw: "driveway sidewalk concrete pavers coating sealer paint stain oil repair crack" },
+    { c: "Maintenance and yard", t: "must", title: "Pest control",
+      s: "Owners handle pest control for their own home and lot, and must take further measures if the HOA notifies you.",
+      d: ["If a pest problem affects several villas, notify the HOA within 10 days of noticing it."],
+      sec: "§13.4", kw: "pests termites bugs ants rodents exterminator insects" },
+    { c: "Maintenance and yard", t: "info", title: "Shared party walls",
+      s: "Repair costs for a shared wall (other than painting) are split equally. You can't cut openings in it or alter it without every sharing owner's agreement.",
+      d: ["If you cause a party wall to be exposed to the weather, you pay the full cost of protecting it.",
+          "An owner who fronts a neighbor's unpaid share can file a lien within 90 days of the repair.",
+          "The HOA can advance the money and bill the neighbor."],
+      sec: "§10.1, §10.2", kw: "party wall shared wall neighbor villa attached window opening" },
+    { c: "Maintenance and yard", t: "info", title: "Shared party roofs",
+      s: "The HOA repairs and replaces shared villa roofs when the Board decides it's needed, and bills the sharing owners equally. Changes to a shared roof need ACC consent.",
+      sec: "§11.2", kw: "roof roofs shared villa repair replace replacement solar" },
+    { c: "Maintenance and yard", t: "must", title: "Keep your home watertight",
+      s: "You're responsible for caulking around windows and door seals. Running the AC with windows or doors open in humid weather can cause condensation and mold, and the HOA has no liability for that.",
+      sec: "§14.40", kw: "water intrusion leak leaks mold humidity rain caulk seal window door air conditioning" },
+    { c: "Maintenance and yard", t: "must", title: "Leaving for an extended time",
+      s: "Notify the HOA in writing, take outdoor furniture and plants inside, and name a caretaker who has a key.",
+      d: ["Give the HOA the caretaker's name.", "The HOA and developer have no responsibility for an unoccupied home."],
+      sec: "§14.11", kw: "vacation travel away absent unoccupied snowbird empty summer key caretaker" },
+
+    /* Exterior changes */
+    { c: "Exterior changes", t: "approve", title: "Patio lights and light fixtures",
+      s: "Any light fixture needs the ACC's written approval before you install it. Holiday lights are the exception, from Oct 15 to Jan 15.",
+      d: ["Landscape lighting also needs prior written ACC approval.",
+          "The ACC can make you remove lighting that spills onto a neighbor's home.",
+          "Holiday lights and decorations may go up Oct 15 and must come down by Jan 15. The ACC may set standards for them.",
+          "Enclosing a patio or adding windows or decks is a separate approval.",
+          "Hardwired work may need a county permit. Getting permits is your responsibility."],
+      sec: "§14.7, §13.2.4, §14.12, §20.11", kw: "patio lights light lighting string lamp lamps led bulbs porch balcony backyard outdoor illumination christmas holiday electrical landscape" },
+    { c: "Exterior changes", t: "approve", title: "How to get ACC approval",
+      s: "Submit an application with any required fee. The ACC has 45 days to decide after it has everything it needs, and silence counts as a denial.",
+      d: ["The ACC may ask for plans, samples, and colors, and you have 15 days to supply anything it requests.",
+          "If denied, you can appeal to the Board.",
+          "The ACC judges suitability, materials, harmony with the neighborhood, and effect on neighbors.",
+          "It can require a security deposit, which it can use to fix any common-area damage from your work.",
+          "You're responsible for all building permits, and for your contractors following the rules."],
+      sec: "§20.8, §20.11, §20.12, §20.21", kw: "acc architectural committee approval apply application permit deposit process denied appeal how" },
+    { c: "Exterior changes", t: "approve", title: "Any change to the outside of your home",
+      s: "No material alteration, addition, or change in appearance to your lot or home without prior written ACC approval.",
+      d: ["ACC approval is aesthetic only. It doesn't replace permits or guarantee drainage or code compliance.",
+          "The HOA and ACC may inspect during reasonable daytime hours to check compliance."],
+      sec: "§14.1 (Alterations), §20.7, §20.13", kw: "change modify modification alteration addition remodel renovation exterior paint color" },
+    { c: "Exterior changes", t: "approve", title: "Fences and walls",
+      s: "Fences and walls need written ACC approval. Side and rear fences must be 6 feet tall and made of wood. Chain link is banned.",
+      d: ["If you fence in part of the common area, you must maintain that part."],
+      sec: "§14.12, §14.22.2", kw: "fence fencing wall privacy wood chain link enclosure" },
+    { c: "Exterior changes", t: "approve", title: "Enclosing a patio or balcony",
+      s: "Enclosures of patios and balconies, including vinyl windows and decks, need prior ACC approval. So do screened enclosures.",
+      sec: "§14.12, §14.31", kw: "patio balcony enclose enclosure screen screened lanai deck vinyl windows porch" },
+    { c: "Exterior changes", t: "approve", title: "Sheds, tents, and storage structures",
+      s: "No sheds, storage buildings, tents, or other structures without ACC approval. Only fenced yards qualify, with a 2-foot setback from lot lines, and nothing visible over the fence.",
+      d: ["Storage pods in a driveway need the HOA's written consent, and can stay only as long as approved.",
+          "Pods can't overhang sidewalks or roads or create blind spots. The HOA may charge a daily fee.",
+          "Water softeners, trash containers, and propane tanks must be screened from the street."],
+      sec: "§14.35", kw: "shed storage structure tent gazebo pergola pod container backyard building" },
+    { c: "Exterior changes", t: "approve", title: "Satellite dishes and antennas",
+      s: "Exterior antennas, dishes, and masts need prior ACC approval. Dishes go on the fascia board when possible with no exposed wires, and may need to be screened.",
+      d: ["Antennas the FCC protects are subject to the Board's rules and current FCC rules."],
+      sec: "§14.30", kw: "satellite dish antenna tv directv starlink internet aerial wires" },
+    { c: "Exterior changes", t: "approve", title: "Solar panels",
+      s: "Solar needs ACC approval. Roof panels go on the rear roof, flush with the slope and below the ridgeline. Ground panels are allowed only in fenced rear yards, no taller than the fence.",
+      d: ["Ground-mounted equipment can't be attached to your fence.",
+          "Equipment may need screening from neighbors and public view."],
+      sec: "§14.33", kw: "solar panels roof energy photovoltaic pv" },
+    { c: "Exterior changes", t: "approve", title: "Hurricane shutters",
+      s: "Visible shutters must be an ACC-approved type. You can close them up to 48 hours before a hurricane, and must open or remove them within 72 hours after the watch or warning ends.",
+      d: ["Panel, accordion, and roll-up shutters can't stay closed outside of a storm event.",
+          "ACC approval isn't an endorsement of how well the shutters work."],
+      sec: "§14.17", kw: "hurricane shutters storm protection panels accordion roll-up windows" },
+    { c: "Exterior changes", t: "ban", title: "Windows and coverings",
+      s: "No window or wall air-conditioning units. Use drapes or blinds, and no foil, sheets, or newspaper except for the first week after moving in.",
+      d: ["Street-facing window treatments must be neutral: white, off-white, or wood tones.",
+          "Security bars, awnings, canopies, shutters, and reflective tint or mirror finishes need ACC approval."],
+      sec: "§14.42, §14.43", kw: "window windows blinds curtains drapes tint security bars awning canopy air conditioner ac unit" },
+    { c: "Exterior changes", t: "approve", title: "Pools and spas",
+      s: "Pools aren't allowed. A spa in a villa's rear yard may be approved by the ACC if it meets local code and sits at least 2 feet from the home and property lines.",
+      sec: "§14.27", kw: "pool swimming spa hot tub jacuzzi backyard" },
+    { c: "Exterior changes", t: "approve", title: "Sports and play equipment",
+      s: "Playground and sports equipment need ACC consent, and belong at the rear of the home or inside corner setbacks. Hoops can't attach to the home, and portable hoops are stored inside.",
+      d: ["No treehouses, skateboard ramps, or tennis courts."],
+      sec: "§14.34", kw: "basketball hoop playground swing trampoline sports skateboard ramp kids treehouse" },
+    { c: "Exterior changes", t: "approve", title: "Decorations and garden objects",
+      s: "Decorative objects such as wind chimes, figurines, weather vanes, and sculptures need ACC approval. Statues, sculptures, and birdbaths aren't allowed in the front yard or where they're visible from the street.",
+      sec: "§14.7", kw: "decoration decorations statue birdbath wind chime figurine garden art sculpture ornaments" },
+    { c: "Exterior changes", t: "approve", title: "Artificial turf and landscape changes",
+      s: "Artificial grass, plants, and rocks need ACC approval. So does removing sod, topsoil, trees, or shrubs, and adding plants, shrubs, or trees.",
+      d: ["Don't remove soil or change the land level in a way that alters water drainage. Grading changes also need local government consent first.",
+          "You're liable if your change sends water onto neighboring lots or common areas."],
+      sec: "§14.3 (Artificial Vegetation), §13.2.3, §14.28", kw: "artificial turf fake grass rocks gravel soil grading drainage trees shrubs plants landscaping remove tree" },
+    { c: "Exterior changes", t: "must", title: "Trash cans, laundry, and stored items",
+      s: "Garbage cans can't be visible from outside your lot unless shielded by an ACC-approved hedge. Laundry can't be hung where it's visible. Nothing is stored in front yards.",
+      d: ["Villa owners may share a common dumpster.",
+          "Bulk items can't go out before 1:00 pm the day before pickup, and you must notify the HOA in writing. Anything left in the common area without notice is dumping and can be fined.",
+          "No outside burning of trash.",
+          "Only usual patio furniture may be kept outside. Everything else is stored in the home.",
+          "The laundry rule is subject to Florida law."],
+      sec: "§14.15, §14.19, §14.26", kw: "trash garbage cans bins dumpster bulk pickup laundry clothesline drying storage front yard furniture patio" },
+    { c: "Exterior changes", t: "must", title: "Grills, propane, and fuel",
+      s: "No cooking or eating and drinking in the front yard or common areas, except in areas the HOA designates. The ACC can restrict grills. Only normal household flammables are allowed.",
+      d: ["Propane tanks (other than grill tanks) must be underground or screened from view."],
+      sec: "§14.6, §14.13, §14.37", kw: "grill bbq barbecue cooking propane fuel gas tank flammable smoke" },
+    { c: "Exterior changes", t: "must", title: "Corner visibility",
+      s: "Nothing that blocks visibility at street intersections may be placed on a corner lot, including vehicles, fences, hedges, and shrubs.",
+      sec: "§14.39", kw: "corner intersection visibility hedge fence sight line" },
+
+    /* Vehicles */
+    { c: "Vehicles", t: "must", title: "Parking",
+      s: "Park in the space assigned to your home. Guests use guest spaces and can stay up to 24 consecutive hours. Vehicles can be towed at the owner's expense.",
+      d: ["Vehicles go only on surfaced parking areas.",
+          "Each lot must keep at least one assigned space.",
+          "You can give up your assigned space by written instrument, and the HOA can reassign it.",
+          "You and your guests must also follow local parking laws."],
+      sec: "§14.1.1", kw: "park parking car cars space guest towing tow visitor overnight driveway street" },
+    { c: "Vehicles", t: "ban", title: "Repairs and inoperable vehicles",
+      s: "A vehicle that can't run on its own power can stay no more than 24 hours. No repairs except emergencies, and no vehicles on blocks.",
+      d: ["Tarp covers on vehicles need ACC approval."],
+      sec: "§14.1.2", kw: "repair mechanic broken inoperable blocks tarp cover car work oil change" },
+    { c: "Vehicles", t: "ban", title: "Commercial vehicles, trailers, boats, and campers",
+      s: "Commercial vehicles, limousines, trailers of any kind, campers, and boats can't be kept in Penn Cove, subject to Florida law.",
+      d: ["Pickups, vans, and cars used daily for normal transportation are not treated as commercial.",
+          "Government and law-enforcement vehicles are allowed.",
+          "No advertising on non-work vehicles in public view, no \"for sale\" signs on vehicles in view, and no expired plates in view.",
+          "No living in a vehicle, temporarily or permanently."],
+      sec: "§14.1.3", kw: "commercial truck van trailer boat camper rv limousine work vehicle advertising for sale expired tag plate" },
+    { c: "Vehicles", t: "ban", title: "Contractors and workers in common areas",
+      s: "Workers you hire, such as landscapers and housekeepers, can't gather in the common areas or use them personally.",
+      sec: "§14.44", kw: "workers contractors landscaper housekeeper maid vendors common area" },
+
+    /* Pets */
+    { c: "Pets", t: "must", title: "Pets",
+      s: "Domestic pets are allowed as long as they aren't a nuisance. Keep pets on a leash outside, and clean up after them. No breeding, and no pets kept for commercial purposes.",
+      d: ["The Board can prohibit breeds it considers dangerous, and can demand removal of animals it believes are a threat. A pet the Board orders removed must go within 48 hours of notice.",
+          "No tying pets outside or leaving them unattended in a yard, balcony, porch, or patio.",
+          "No dog runs. Leash-free time is allowed only in an enclosed yard approved by the ACC.",
+          "Pets go to the bathroom only in designated pet areas or on your own lot.",
+          "The Board's nuisance determination about a pet is conclusive.",
+          "Roosters and pigeons are banned. Seeing-eye dogs are exempt from these limits."],
+      sec: "§14.2", kw: "dog dogs cat cats pet pets animal animals leash poop waste breed bark barking chickens rooster pigeon" },
+
+    /* Conduct and signs */
+    { c: "Conduct and signs", t: "ban", title: "Nuisances and noise",
+      s: "Nothing that causes unreasonable annoyance is allowed, including loud music and gathering in front of homes or common areas. The Board decides what's a nuisance.",
+      d: ["No firearms discharge.",
+          "Don't do anything that would raise the HOA's insurance rate.",
+          "No immoral, offensive, unlawful, or obnoxious use, and all laws must be followed."],
+      sec: "§14.24, §14.20", kw: "noise loud music party neighbors nuisance quiet disturbance gathering firearms gun smell smoke" },
+    { c: "Conduct and signs", t: "must", title: "Kids and guests",
+      s: "You're responsible for the actions of children living in or visiting your home. Children under 12 must be accompanied by an adult when using common facilities.",
+      sec: "§14.23", kw: "children kids minors under 12 supervision guests playground" },
+    { c: "Conduct and signs", t: "approve", title: "Signs",
+      s: "No signs, banners, or notices visible from outside without ACC approval. No signs in windows. \"For Sale\" and \"For Rent\" signs must be approved and no larger than 5 by 8 inches, and aren't allowed while the developer still has homes for sale.",
+      d: ["Signs required by government agencies are allowed if approved (for example, permit boards)."],
+      sec: "§14.32", kw: "sign signs banner for sale for rent political yard sign advertisement window" },
+    { c: "Conduct and signs", t: "info", title: "Flags",
+      s: "You can fly the US flag plus one more permitted flag from a freestanding flagpole up to 20 feet tall on your lot, outside any easement.",
+      d: ["The second flag can be the Florida flag, a US military branch flag, a POW-MIA flag, or a first-responder flag. It can't be bigger than the US flag.",
+          "The US flag can be up to 4½ by 6 feet.",
+          "Holiday flags up to 24 by 36 inches attached to the home don't need ACC approval.",
+          "The pole must follow building codes, setbacks, and local noise and lighting rules."],
+      sec: "§14.32", kw: "flag flags flagpole american us united states florida military pow first responder banner holiday" },
+    { c: "Conduct and signs", t: "ban", title: "Business use",
+      s: "No commercial activity in a home. A home office for your own personal use is fine, but clients, customers, and employees can't meet you there unless the Board allows it.",
+      d: ["No daycare, and no solicitors without the HOA's written consent.",
+          "No garage sales unless the HOA allows them."],
+      sec: "§14 Commercial Activity", kw: "business work from home office commercial daycare garage sale yard sale solicit airbnb clients" },
+    { c: "Conduct and signs", t: "ban", title: "Negative postings about the community",
+      s: "Picketing and posting negative signs, websites, advertising, or information at public gatherings are prohibited, to protect home values.",
+      sec: "§14 Completion and Sale of Homes", kw: "picketing negative online review website social media complaint protest speech" },
+    { c: "Conduct and signs", t: "info", title: "Directing HOA contractors",
+      s: "Only an HOA officer or the management company's representative may direct the HOA's contractors. Owners can't.",
+      sec: "§14.5", kw: "contractors landscapers vendors direct instruct hoa staff" },
+
+    /* Leasing and sales */
+    { c: "Leasing and sales", t: "must", title: "Renting out your home",
+      s: "Lease the entire home only, for at least 6 months, no more than 2 leases per 12 months. The HOA must approve every lease, and every renewal.",
+      d: ["No room rentals, bed-and-breakfast, short-term or transient guests, time-shares, or subleasing.",
+          "Maximum 2 people per bedroom (visiting guests excepted).",
+          "You must be current on dues before renting.",
+          "Leases must be written, on HOA-approved forms, and the HOA gets a copy.",
+          "The HOA can terminate a lease if the tenant breaks the rules.",
+          "You're jointly liable for damage your tenant causes to the common areas.",
+          "You must give your tenants copies of the HOA documents."],
+      sec: "§14.21, §26.1.2", kw: "rent rental lease leasing tenant tenants landlord airbnb vrbo short term sublease sublet room roommate investor" },
+    { c: "Leasing and sales", t: "info", title: "Tenant screening, fees, and deposits",
+      s: "For a lease, the HOA can charge a transfer fee, a background-check fee up to $100, and a security deposit up to one month's rent.",
+      d: ["Tenants can't be denied solely for credit score, and any credit guideline can't be higher than what an FHA loan requires.",
+          "The HOA has 30 days to approve or disapprove a lease application.",
+          "You are responsible for permits required by any government for renting."],
+      sec: "§14.21, §26.2.1.2, §26.2.2.2", kw: "tenant screening background check credit deposit fee application approve approval rent renter" },
+    { c: "Leasing and sales", t: "must", title: "Family or friends living there when you don't",
+      s: "If you don't live in the home and let family or friends stay without a lease, they must register with the HOA before moving in and go through the same screening as tenants.",
+      sec: "§14.21, §14.38", kw: "family friends guests live stay occupant relatives move in without lease register" },
+    { c: "Leasing and sales", t: "info", title: "Selling your home",
+      s: "The HOA may screen buyers. If it does, it has 30 days to approve or disapprove. If it doesn't, you just notify the HOA and give it a copy of the signed contract.",
+      d: ["A transfer fee and notice on the HOA's form are required when screening applies.",
+          "Approved sales get a certificate signed by HOA officers, in recordable form.",
+          "You must be current on dues and hold an estoppel certificate before selling."],
+      sec: "§26.1.1, §26.2, §18.13", kw: "sell selling sale buyer buyers purchase transfer approval closing screening" },
+    { c: "Leasing and sales", t: "info", title: "Gifts, inheritance, and entity owners",
+      s: "Gifting a home needs HOA approval. Inheriting one requires notice to the HOA, except when the heir is the prior owner's spouse, parent, or child.",
+      d: ["If an LLC, trust, or company owns the home, the primary occupant or beneficial owners must be approved by the HOA.",
+          "A change in the occupant or beneficial owners counts as a change of ownership."],
+      sec: "§26.1.3, §26.2.2.3, §26.2.3", kw: "gift inherit inheritance estate will trust llc company entity corporation deed transfer heir" },
+
+    /* Enforcement */
+    { c: "Enforcement", t: "info", title: "Fines and suspensions",
+      s: "Fines are $100 per violation, per day, with no cap on the total. They require 14 days' written notice and a hearing before an independent committee of at least 3 people.",
+      d: ["The committee must confirm the fine by majority vote. You can bring a lawyer and cross-examine witnesses.",
+          "A written decision must come within 21 days of the hearing.",
+          "Fines are due 5 days after notice of the assessment.",
+          "The HOA can also suspend your, your tenants', or your guests' use of the common areas and common services."],
+      sec: "§21.8", kw: "fine fines penalty suspension hearing committee violation notice appeal per day" },
+    { c: "Enforcement", t: "info", title: "If you get a violation notice",
+      s: "For most violations, you have 7 days after written notice to fix the problem. After that, the HOA can sue to force compliance or recover damages, and you owe its expenses and attorney fees.",
+      d: ["The HOA can enter, do the work, and bill you as an individual assessment.",
+          "The HOA can require tenants, guests, and other occupants to leave if they violate the rules or create a nuisance.",
+          "Not enforcing a rule once doesn't waive it."],
+      sec: "§21.2, §21.3, §21.4, §21.5, §21.9", kw: "violation notice cure days lawsuit attorney evict enforce comply letter warning" },
+    { c: "Enforcement", t: "info", title: "HOA entry and inspections",
+      s: "The HOA and ACC can enter and inspect any part of the community during reasonable daytime hours to check compliance, and the HOA has easements to do maintenance it's responsible for.",
+      sec: "§12.13, §20.13", kw: "inspection inspect enter entry access trespass property hoa easement" },
+    { c: "Enforcement", t: "info", title: "Disputes and arbitration",
+      s: "Disputes involving the declaration, the community, or the developer must go to mediation first, then binding arbitration, not court.",
+      d: ["Mediation is run by the American Arbitration Association.",
+          "Submitting to mediation is a condition before taking further action."],
+      sec: "§22.12", kw: "dispute lawsuit court sue arbitration mediation legal developer builder warranty defect" },
+
+    /* Insurance and damage */
+    { c: "Insurance and damage", t: "must", title: "Insuring your home",
+      s: "You must carry adequate insurance on your home, enough to repair or rebuild it, or demolish it, clear debris, and resod. The HOA can ask for proof of coverage.",
+      sec: "§16.2.1", kw: "insurance homeowners policy coverage proof insure flood windstorm" },
+    { c: "Insurance and damage", t: "must", title: "After a fire or other major damage",
+      s: "You must either rebuild or tear the home down. Repairs must begin within 30 days of getting insurance proceeds. Demolition must be finished within 6 months of the casualty.",
+      d: ["Rebuilding needs ACC approval.",
+          "In a villa building with shared walls, demolishing needs written agreement from every owner in that building. Without it, everyone must repair.",
+          "The HOA can inspect progress and step in if you don't act."],
+      sec: "§16.2.2, §16.2.3, §16.2.5, §14 Casualty Destruction", kw: "fire hurricane damage casualty rebuild demolish destroyed storm repair insurance claim" },
+
+    /* Governance */
+    { c: "Governance", t: "info", title: "Membership and voting",
+      s: "You become an HOA member automatically when you take title to a lot. Membership can't be separated from ownership. Voting is governed by the Articles and By-Laws.",
+      sec: "§7.3, §7.5", kw: "member membership vote voting board meeting owner association" },
+    { c: "Governance", t: "info", title: "Changing the declaration",
+      s: "After the developer turns over control, amendments need 66⅔% of the Board plus 75% of the votes present at a duly noticed meeting with a quorum.",
+      d: ["Before turnover, the developer can amend on its own.",
+          "Some amendments affecting developer or easement-holder rights need their consent.",
+          "An amendment isn't effective until recorded in the public records."],
+      sec: "§4.1, §4.3, §4.4", kw: "amend amendment change rules vote developer turnover board" },
+    { c: "Governance", t: "info", title: "Developer control and how long it lasts",
+      s: "The developer keeps broad control over the HOA, including the right to amend the declaration, until turnover. The declaration itself is perpetual and runs with the land.",
+      sec: "§4.3, §7.1, §7.7, §8", kw: "developer lennar turnover control board perpetual duration term forever" },
+    { c: "Governance", t: "info", title: "HOA documents and Board rules",
+      s: "Owners and lenders can request current copies of the HOA documents to inspect during normal business hours. The Board can adopt separate Rules and Regulations, so check those in addition to this declaration.",
+      sec: "§19.1, §2 (Rules and Regulations)", kw: "records documents rules regulations bylaws articles inspect copy request board" }
+  ];
+
+  /* ---------- helpers ---------- */
+  function norm(s) { return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function reEsc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  function stem(t) {
+    if (t.length > 5 && t.slice(-3) === "ing") return t.slice(0, -3);
+    if (t.length > 3 && t.slice(-1) === "s") return t.slice(0, -1);
+    return t;
+  }
+
+  RULES.forEach(function (r) {
+    r._t = norm(r.title);
+    r._k = norm(r.kw + " " + r.c);
+    r._s = norm(r.s);
+    r._d = norm((r.d || []).join(" ") + " " + r.sec);
+  });
+
+  var state = { q: "", cat: "All", type: "all" };
+  var $q = document.getElementById("q");
+  var $clear = document.getElementById("clear");
+  var $cats = document.getElementById("cats");
+  var $types = document.getElementById("types");
+  var $try = document.getElementById("try");
+  var $tryrow = document.getElementById("tryrow");
+  var $status = document.getElementById("status");
+  var $list = document.getElementById("list");
+
+  function tokens(q) {
+    return norm(q).split(/[^a-z0-9]+/).filter(Boolean).map(stem);
+  }
+
+  function has(hay, t) {
+    var i = hay.indexOf(t);
+    while (i > -1) {
+      if (i === 0 || !/[a-z0-9]/.test(hay.charAt(i - 1))) return true;
+      i = hay.indexOf(t, i + 1);
+    }
+    return false;
+  }
+
+  function score(r, toks) {
+    var total = 0;
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i], s = 0;
+      if (has(r._t, t)) s += 6;
+      if (has(r._k, t)) s += 4;
+      if (has(r._s, t)) s += 3;
+      if (has(r._d, t)) s += 1;
+      if (!s) return 0;
+      total += s;
+    }
+    return total || 1;
+  }
+
+  function hl(text, re) {
+    if (!re) return esc(text);
+    var parts = String(text).split(re), out = "";
+    for (var i = 0; i < parts.length; i++) {
+      out += i % 2 ? "<mark>" + esc(parts[i]) + "</mark>" : esc(parts[i]);
+    }
+    return out;
+  }
+
+  /* ---------- controls ---------- */
+  function buildChips() {
+    var counts = { All: RULES.length };
+    RULES.forEach(function (r) { counts[r.c] = (counts[r.c] || 0) + 1; });
+    var h = "";
+    ["All"].concat(CATS).forEach(function (c) {
+      h += '<button type="button" class="chip" data-cat="' + esc(c) + '" aria-pressed="' + (state.cat === c) + '">' + esc(c) + '<span class="n">' + counts[c] + '</span></button>';
+    });
+    $cats.innerHTML = h;
+
+    var th = '<button type="button" class="chip" data-type="all" aria-pressed="' + (state.type === "all") + '">All types</button>';
+    Object.keys(TYPES).forEach(function (k) {
+      th += '<button type="button" class="chip" data-type="' + k + '" aria-pressed="' + (state.type === k) + '">' + TYPES[k] + '</button>';
+    });
+    $types.innerHTML = th;
+
+    var samples = ["lights", "fence", "dog", "rent", "parking", "fine", "solar", "shed", "paint", "late fee"];
+    $tryrow.innerHTML = samples.map(function (s) {
+      return '<button type="button" class="chip" data-try="' + esc(s) + '">' + esc(s) + '</button>';
+    }).join("");
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    var toks = tokens(state.q);
+    var re = toks.length ? new RegExp("\\b(" + toks.map(reEsc).join("|") + ")", "gi") : null;
+
+    var rows = [];
+    RULES.forEach(function (r, i) {
+      if (state.cat !== "All" && r.c !== state.cat) return;
+      if (state.type !== "all" && r.t !== state.type) return;
+      var sc = toks.length ? score(r, toks) : 1;
+      if (!sc) return;
+      rows.push({ r: r, sc: sc, i: i });
+    });
+    if (toks.length) rows.sort(function (a, b) { return b.sc - a.sc || a.i - b.i; });
+
+    $clear.hidden = !state.q;
+    $try.style.display = state.q || state.cat !== "All" || state.type !== "all" ? "none" : "";
+
+    var filtered = state.q || state.cat !== "All" || state.type !== "all";
+    $status.textContent = rows.length
+      ? (filtered ? rows.length + (rows.length === 1 ? " rule" : " rules") + " found" : RULES.length + " rules, grouped by topic")
+      : "";
+
+    if (!rows.length) {
+      $list.innerHTML = '<li class="empty"><h2>No rule matches that</h2><p>Try a simpler word, such as “fence” or “pet”, or clear your filters. If it isn\'t here, the Board\'s separate Rules and Regulations may cover it.</p><button class="btn" type="button" id="reset">Clear search and filters</button></li>';
+      return;
+    }
+
+    var html = "";
+    rows.forEach(function (x) {
+      var r = x.r;
+      var openDetails = toks.length && !toks.some(function (t) { return has(r._t, t) || has(r._s, t); }) ? " open" : "";
+      var details = "";
+      if (r.d && r.d.length) {
+        details = "<details" + openDetails + "><summary>Specifics and limits</summary><ul>" +
+          r.d.map(function (line) { return "<li>" + hl(line, re) + "</li>"; }).join("") + "</ul></details>";
+      }
+      html += '<li class="rule" data-t="' + r.t + '">' +
+        '<span class="tag">' + TYPES[r.t] + '</span>' +
+        '<h3>' + hl(r.title, re) + '</h3>' +
+        '<p>' + hl(r.s, re) + '</p>' +
+        details +
+        (r.w ? '<button type="button" class="draft" data-w="' + r.w + '">Draft a request</button>' : '') +
+        '<p class="sec">Declaration ' + esc(r.sec) + ' &middot; ' + esc(r.c) + '</p>' +
+        '</li>';
+    });
+    $list.innerHTML = html;
+  }
+
+  function syncUrl() {
+    // State lives in the URL hash, never the query string: the hash is
+    // never sent to the server, so it can't interact with server-side
+    // auth (e.g. an Azure AD proxy checking the request's query length).
+    try {
+      var p = new URLSearchParams();
+      if (typeof view !== "undefined" && view === "write") {
+        p.set("view", "write"); p.set("type", $wtype.value);
+      } else if (state.q) {
+        p.set("q", state.q);
+      }
+      var hash = p.toString();
+      var url = window.location.pathname + window.location.search + (hash ? "#" + hash : "");
+      window.history.replaceState(null, "", url);
+    } catch (e) { /* storage or history unavailable in this view */ }
+  }
+
+  function refreshPressed() {
+    Array.prototype.forEach.call($cats.querySelectorAll(".chip"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-cat") === state.cat));
+    });
+    Array.prototype.forEach.call($types.querySelectorAll(".chip"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-type") === state.type));
+    });
+  }
+
+  function update() { refreshPressed(); render(); syncUrl(); }
+
+  /* ---------- events ---------- */
+  $q.addEventListener("input", function () { state.q = $q.value.trim(); update(); });
+  $q.addEventListener("keydown", function (e) { if (e.key === "Enter") $q.blur(); });
+  $clear.addEventListener("click", function () { $q.value = ""; state.q = ""; update(); $q.focus(); });
+
+  $cats.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-cat]"); if (!b) return;
+    state.cat = b.getAttribute("data-cat"); update();
+  });
+  $types.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-type]"); if (!b) return;
+    state.type = b.getAttribute("data-type"); update();
+  });
+  $tryrow.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-try]"); if (!b) return;
+    $q.value = b.getAttribute("data-try"); state.q = $q.value; update();
+  });
+  $list.addEventListener("click", function (e) {
+    if (e.target.id === "reset") {
+      state = { q: "", cat: "All", type: "all" }; $q.value = ""; update();
+    }
+  });
+
+  /* ================= Write a request ================= */
+  var W_MAP = {
+    "Patio lights and light fixtures": "acc-lights",
+    "How to get ACC approval": "acc-other",
+    "Any change to the outside of your home": "acc-other",
+    "Fences and walls": "acc-fence",
+    "Enclosing a patio or balcony": "acc-enclosure",
+    "Sheds, tents, and storage structures": "acc-shed",
+    "Satellite dishes and antennas": "acc-dish",
+    "Solar panels": "acc-solar",
+    "Hurricane shutters": "acc-shutters",
+    "Windows and coverings": "acc-windows",
+    "Pools and spas": "acc-spa",
+    "Sports and play equipment": "acc-sports",
+    "Decorations and garden objects": "acc-decor",
+    "Artificial turf and landscape changes": "acc-landscape",
+    "Driveways and sidewalks": "acc-driveway",
+    "Renting out your home": "lease",
+    "Tenant screening, fees, and deposits": "lease",
+    "Family or friends living there when you don't": "occupant",
+    "Selling your home": "sale",
+    "Fees when you buy or sell": "estoppel",
+    "Leaving for an extended time": "absence",
+    "Trash cans, laundry, and stored items": "bulk",
+    "Fines and suspensions": "violation",
+    "If you get a violation notice": "violation",
+    "HOA documents and Board rules": "docs"
+  };
+  RULES.forEach(function (r) { if (W_MAP[r.title]) r.w = W_MAP[r.title]; });
+
+  var ACC_HINT = " The ACC has 45 days to answer once it has everything it needs, and silence counts as a denial.";
+
+  function acc(id, label, short, what, refs, hint, ex, extras, attach, more) {
+    var fields = [
+      { k: "desc", l: "What do you want to do?", t: "area", b: "describe the project", ex: ex.desc },
+      { k: "where", l: "Where on your property?", t: "text", b: "location on the property", ex: ex.where || "For example: rear patio, along the back fence" },
+      { k: "specs", l: "Materials, colors, size, or model", t: "text", b: "materials, colors, and size", ex: ex.specs }
+    ];
+    (more || []).forEach(function (f) { fields.push(f); });
+    fields.push({ k: "who", l: "Who will do the work?", t: "text", b: "who will do the work", ex: "Myself, or the contractor's name and license number" });
+    fields.push({ k: "when", l: "When do you plan to start and finish?", t: "text", b: "planned start and finish", ex: "For example: start October 5, done in two days" });
+    return {
+      id: id, group: "acc", label: label, to: "Architectural Control Committee",
+      re: "Request for architectural approval: " + short, refs: refs, hint: hint + ACC_HINT,
+      fields: fields, attach: attach, extras: extras || [], what: what, power: id === "acc-lights"
+    };
+  }
+
+  var TEMPLATES = [
+    acc("acc-lights", "Install lighting (patio, landscape, string lights)", "outdoor lighting", "install exterior lighting on my property",
+      "Sections 14.7 and 13.2.4", "Light fixtures and landscape lighting need prior written approval. Holiday lights (Oct 15 to Jan 15) don't.",
+      { desc: "For example: six warm-white LED string lights hung along the back patio", specs: "Fixture type and model, number of lights, brightness, and color" },
+      ["I will aim and shield the lighting so it does not spill onto neighboring homes. I understand the Committee may require removal of any lighting that becomes a nuisance (Section 14.7)."],
+      ["Product photo or specification sheet", "Sketch or photo showing where the lights will go", "Electrical permit or contractor details, if the lighting is hardwired"],
+      [{ k: "power", l: "How is it powered?", t: "select", b: "plug-in, solar, or hardwired", o: ["Plug-in", "Battery or solar", "Hardwired"] }]),
+    acc("acc-fence", "Build or change a fence or wall", "fence or wall", "build or change a fence or wall",
+      "Section 14.12", "Side and rear fences must be 6 ft tall and wood. Chain link is banned.",
+      { desc: "For example: a 6-foot wood privacy fence across the back of the lot", specs: "Height, material, color, and gate locations" },
+      ["I understand side and rear fences must be six feet tall and made of wood, that chain link is not permitted, and that I will maintain any common area my fence encloses (Sections 14.12 and 14.22.2)."],
+      ["Survey or plot plan marking the fence line", "Material and color sample or photo", "Contractor details"]),
+    acc("acc-enclosure", "Enclose a patio or balcony (screen, vinyl windows, deck)", "patio or balcony enclosure", "enclose or modify my patio or balcony",
+      "Sections 14.12 and 14.31", "Enclosures of patios and balconies, screened enclosures, vinyl windows, and decks all need approval.",
+      { desc: "For example: a screened enclosure over the rear patio", specs: "Frame and screen materials, colors, and dimensions" }, [],
+      ["Plans or drawings", "Material and color samples", "Contractor and permit details"]),
+    acc("acc-shed", "Add a shed or storage structure", "shed or storage structure", "install a storage structure on my lot",
+      "Section 14.35", "Only fenced yards qualify. It needs a 2 ft setback and can't be visible over the fence.",
+      { desc: "For example: a small resin storage shed in the back corner of the yard", specs: "Dimensions, material, and color" },
+      ["I understand the structure is allowed only in a fenced yard, must sit at least two feet from all lot lines, and may not be visible over an ACC-approved fence (Section 14.35)."],
+      ["Dimensions and a photo or drawing of the structure", "Site sketch showing location and setbacks", "Photo of the fenced yard"]),
+    acc("acc-dish", "Install a satellite dish or antenna", "satellite dish or antenna", "install exterior satellite or antenna equipment",
+      "Section 14.30", "Dishes go on the fascia board when possible with no exposed wires, and may need screening.",
+      { desc: "For example: one small satellite dish on the rear fascia board", specs: "Equipment model and size" },
+      ["I understand dishes should be placed on the fascia board when possible with no exposed wires, and that the Committee may require screening from neighbors and common areas (Section 14.30)."],
+      ["Photo or specifications of the equipment", "Photo or sketch of the proposed location"]),
+    acc("acc-solar", "Install solar panels", "solar panels", "install solar equipment",
+      "Sections 14.33 and 11.2.3", "Roof panels go on the rear roof, flush and below the ridgeline. Ground panels only in a fenced rear yard.",
+      { desc: "For example: 12 roof-mounted panels on the rear roof plane", specs: "Panel count, size, and model" },
+      ["I understand roof-mounted panels must be flush-mounted on the rear roof area and stay below the ridgeline, that ground-mounted equipment is allowed only in a fenced rear yard and may not exceed the fence height, and that any change to a shared party roof also needs the Committee's consent (Sections 14.33 and 11.2.3)."],
+      ["System layout and panel specifications", "Roof plan showing panel locations", "Contractor and permit details"]),
+    acc("acc-shutters", "Install hurricane shutters", "hurricane shutters", "install hurricane shutters",
+      "Section 14.17", "Visible shutters must be an approved type, and can't stay closed outside a storm event.",
+      { desc: "For example: removable aluminum panel shutters for all windows and the sliding door", specs: "Shutter type, material, and color" },
+      ["I understand I may close the shutters only up to 48 hours before an expected hurricane and must open or remove them within 72 hours after the hurricane watch or warning ends (Section 14.17)."],
+      ["Product brochure or photo of the shutter type", "Color information"]),
+    acc("acc-windows", "Change windows, add awnings, security bars, or tint", "window changes", "change my windows or window coverings",
+      "Section 14.43", "Security bars, awnings, canopies, reflective tint, and mirror finishes need approval. Street-facing coverings must be neutral.",
+      { desc: "For example: add reflective tint to the front windows", specs: "Product, color, and finish" }, [],
+      ["Product photo or sample", "Photo of the window or wall"]),
+    acc("acc-driveway", "Coat or resurface a driveway", "driveway surface", "apply a surface treatment to my driveway",
+      "Section 14.29", "Approval covers material, color, and pattern.",
+      { desc: "For example: apply a gray epoxy coating to the driveway", specs: "Material, color, and pattern" },
+      ["I understand the application may not extend beyond the front lot line or onto the sidewalk (Section 14.29)."],
+      ["Material, color, and pattern sample", "Photo of the current driveway"]),
+    acc("acc-landscape", "Change landscaping, remove a tree, add plants, or change grading", "landscaping change", "make a landscaping change on my lot",
+      "Sections 13.2.3, 14.3, and 14.28", "Removing sod, soil, trees, or shrubs, adding plants or trees, and using artificial turf all need approval.",
+      { desc: "For example: remove one palm and plant two shade trees in the rear yard", specs: "Plant names, sizes, and quantities" },
+      ["I do not intend to change the flow or drainage of surface water. I understand that any soil removal or grading change needs prior written consent from the local government, and that I am liable for damage my changes cause to other lots or the common areas (Section 14.28)."],
+      ["Sketch of the planting or grading plan", "List of plants or trees", "Photo of the area as it is now"]),
+    acc("acc-spa", "Add a spa or hot tub", "spa", "install a spa in my rear yard",
+      "Section 14.27", "Pools aren't allowed. A rear-yard spa may be approved.",
+      { desc: "For example: a portable 6-person spa on a concrete pad in the rear yard", specs: "Dimensions, model, and pad material" },
+      ["I understand a spa in a villa's rear yard must meet local code and sit at least two feet from the home and all property lines (Section 14.27)."],
+      ["Specification sheet and dimensions", "Site sketch showing setbacks", "Permit information"]),
+    acc("acc-sports", "Add sports or play equipment", "sports or play equipment", "install recreational equipment",
+      "Section 14.34", "Belongs at the rear of the home. Nothing attaches to the house, and portable hoops are stored inside.",
+      { desc: "For example: a small play set in the rear yard", specs: "Dimensions and material" },
+      ["I understand approved equipment must be located at the rear of the home (or within setback lines on the inside of a corner lot), that no equipment may attach to the home, and that portable basketball hoops must be stored inside (Section 14.34)."],
+      ["Photo or specifications of the equipment", "Site sketch showing location"]),
+    acc("acc-decor", "Add a decorative object (wind chime, weather vane, artwork)", "decorative object", "place a decorative object on my property",
+      "Section 14.7", "Decorative objects need approval. Statues, sculptures, and birdbaths aren't allowed in the front yard.",
+      { desc: "For example: a wind chime hung on the rear patio", specs: "Size, material, and color" },
+      ["I understand statues, sculptures, and birdbaths may not be placed in the front yard or where they are visible from the street (Section 14.7)."],
+      ["Photo of the item", "Sketch of where it will go"]),
+    acc("acc-other", "Any other exterior change", "exterior change", "make an exterior change to my lot or home",
+      "Sections 14.1 and 20.7", "Any material alteration or change in appearance needs prior written approval.",
+      { desc: "Describe the change", specs: "Materials, colors, and dimensions" }, [],
+      ["Photos, drawings, or product information", "Site sketch showing location"]),
+
+    { id: "lease", group: "note", label: "Ask for approval to rent out my home", to: "Board of Directors", re: "Lease approval request",
+      refs: "Sections 14.21 and 26", hint: "Every lease and renewal needs approval. The HOA has 30 days to answer.",
+      fields: [
+        { k: "tenants", l: "Tenant name(s)", t: "text", b: "tenant name(s)" },
+        { k: "occ", l: "Number of occupants", t: "text", b: "number of occupants" },
+        { k: "beds", l: "Number of bedrooms", t: "text", b: "number of bedrooms" },
+        { k: "start", l: "Lease start date", t: "text", b: "lease start date" },
+        { k: "term", l: "Lease term (months)", t: "text", b: "lease term in months" }
+      ],
+      attach: ["Transfer fee payment", "Executed copy of the proposed lease, stating it is subject to Association approval", "Tenant application or background-check information"],
+      body: function (g, c) {
+        return [
+          "I am the owner of the home at " + c.addr + " in Penn Cove. Under Sections 14.21 and 26 of the Declaration, I am requesting the Association's approval to lease my home.",
+          "Proposed tenant(s): " + g("tenants") + "\nNumber of occupants: " + g("occ") + "\nBedrooms: " + g("beds") + "\nLease start date: " + g("start") + "\nLease term: " + g("term") + " months",
+          "The proposed lease is for the entire home and is in writing. I understand the term must be at least six months, that the home may not be subject to more than two leases in any twelve-month period, that subleasing and time-shares are not permitted, that occupancy is limited to two persons per bedroom, and that I must be current on my assessments.",
+          "I understand the Association may require its approved lease form, a background-check fee of up to $100, and a security deposit of up to one month's rent.",
+          "Under Section 26.2.2.2, the Association has thirty days after receiving this notice and the requested information to approve or disapprove the lease. Please send the certificate of approval to me at " + c.contact + "."
+        ];
+      } },
+    { id: "occupant", group: "note", label: "Register family or friends staying without a lease", to: "Board of Directors", re: "Occupant registration",
+      refs: "Sections 14.21 and 14.38", hint: "If you don't live in the home, anyone staying without a lease must be registered and screened before moving in.",
+      fields: [
+        { k: "occ", l: "Who will be staying?", t: "text", b: "occupant name(s)" },
+        { k: "rel", l: "Relationship to you", t: "text", b: "relationship to me" },
+        { k: "move", l: "Planned move-in date", t: "text", b: "move-in date" }
+      ],
+      attach: [],
+      body: function (g, c) {
+        return [
+          "Under Sections 14.21 and 14.38 of the Declaration, I am registering the following people to occupy my home at " + c.addr + " without a lease. I do not currently live in the home.",
+          "Occupant(s): " + g("occ") + "\nRelationship to me: " + g("rel") + "\nPlanned move-in date: " + g("move"),
+          "I understand they will go through the same screening and approval process the Association uses for prospective tenants, and that they must be approved before they move in. Please send me the registration form and let me know what information you need. You can reach me at " + c.contact + "."
+        ];
+      } },
+    { id: "absence", group: "note", label: "Notify the HOA I'll be away for an extended time", to: "Board of Directors", re: "Notice of extended absence",
+      refs: "Section 14.11", hint: "Before leaving, notify the HOA in writing, bring outdoor items inside, and name a caretaker with a key.",
+      fields: [
+        { k: "leave", l: "Leaving on", t: "text", b: "departure date" },
+        { k: "back", l: "Returning on", t: "text", b: "return date" },
+        { k: "care", l: "Caretaker's name", t: "text", b: "caretaker's name" },
+        { k: "carep", l: "Caretaker's phone", t: "text", b: "caretaker's phone" }
+      ],
+      attach: [],
+      body: function (g, c) {
+        return [
+          "Under Section 14.11 of the Declaration, I am notifying the Association that my home at " + c.addr + " will be unoccupied from " + g("leave") + " to " + g("back") + ".",
+          "Before I leave, I will remove all removable furniture, plants, and other objects from outside the home. I have designated the following person to care for the home and to hold a key:\nName: " + g("care") + "\nPhone: " + g("carep"),
+          "You can also reach me at " + c.contact + "."
+        ];
+      } },
+    { id: "estoppel", group: "note", label: "Request an estoppel certificate (for a sale)", to: "Board of Directors", re: "Assessment estoppel certificate request",
+      refs: "Section 18.13", hint: "You must pay all sums due and receive this certificate before selling. The HOA has 10 days to provide it, and charges a reasonable fee.",
+      fields: [
+        { k: "asof", l: "Certificate needed as of (usually the closing date)", t: "text", b: "closing date" },
+        { k: "title", l: "Title company or closing agent (optional)", t: "text", b: "title company", opt: true }
+      ],
+      attach: [],
+      body: function (g, c) {
+        var cc = g("title", true);
+        return [
+          "I own the home at " + c.addr + " in Penn Cove and am selling it. Under Section 18.13 of the Declaration, I am requesting an assessment estoppel certificate, in recordable form, stating whether all assessments have been paid and the amount due as of " + g("asof") + ".",
+          "The Declaration provides for delivery within ten days of a written request. Please tell me the fee for preparing the certificate and how to pay it.",
+          "Please send the certificate to me at " + c.contact + (cc ? ", with a copy to " + cc : "") + "."
+        ];
+      } },
+    { id: "sale", group: "note", label: "Notify the HOA I'm selling my home", to: "Board of Directors", re: "Notice of intended sale",
+      refs: "Section 26.1.1", hint: "The HOA may screen buyers. If it doesn't, you still must notify it and give it a copy of the signed contract.",
+      fields: [
+        { k: "buyer", l: "Buyer name(s)", t: "text", b: "buyer name(s)" },
+        { k: "bcon", l: "Buyer contact information", t: "text", b: "buyer contact information" },
+        { k: "cdate", l: "Contract date", t: "text", b: "contract date" },
+        { k: "close", l: "Expected closing date", t: "text", b: "expected closing date" }
+      ],
+      attach: ["Copy of the executed purchase contract"],
+      body: function (g, c) {
+        return [
+          "I am the owner of the home at " + c.addr + " in Penn Cove. Under Section 26.1.1 of the Declaration, I am notifying the Association that I intend to sell my home.",
+          "Buyer(s): " + g("buyer") + "\nBuyer contact: " + g("bcon") + "\nContract date: " + g("cdate") + "\nExpected closing date: " + g("close"),
+          "If the Association screens purchasers, please send me its approval form and the transfer fee amount, and I will submit them promptly. Under Section 26.2.2.1, the Association has thirty days after receiving the notice and required information to approve or disapprove the sale."
+        ];
+      } },
+    { id: "bulk", group: "note", label: "Notify the HOA of a bulk trash pickup", to: "Board of Directors", re: "Bulk pickup notice",
+      refs: "Section 14.15", hint: "Bulk items can go to the swale no earlier than 1:00 pm the day before pickup, and you must notify the HOA in writing.",
+      fields: [
+        { k: "items", l: "What are you putting out?", t: "text", b: "items being picked up" },
+        { k: "pdate", l: "Scheduled pickup date", t: "text", b: "pickup date" }
+      ],
+      attach: [],
+      body: function (g, c) {
+        return [
+          "Under Section 14.15 of the Declaration, I am notifying the Association in writing that I have requested a bulk pickup for my home at " + c.addr + ".",
+          "Items: " + g("items") + "\nScheduled pickup date: " + g("pdate"),
+          "I will place the items at the swale no earlier than 1:00 pm on the day before the scheduled pickup."
+        ];
+      } },
+    { id: "pod", group: "note", label: "Ask to place a storage pod in my driveway", to: "Board of Directors", re: "Storage pod consent request",
+      refs: "Section 14.35", hint: "Pods need the HOA's prior written consent, which sets how long the pod can stay. The HOA may charge a daily fee.",
+      fields: [
+        { k: "size", l: "Pod size", t: "text", b: "pod size" },
+        { k: "ddate", l: "Delivery date", t: "text", b: "delivery date" },
+        { k: "days", l: "How long will it stay?", t: "text", b: "time on the driveway" }
+      ],
+      attach: [],
+      body: function (g, c) {
+        return [
+          "Under Section 14.35 of the Declaration, I am requesting the Association's prior written consent to place a storage pod in my driveway at " + c.addr + ".",
+          "Pod size: " + g("size") + "\nDelivery date: " + g("ddate") + "\nTime on the driveway: " + g("days"),
+          "I understand the consent will state how long the pod may remain, that the Association may charge a daily fee, and that the pod may not overhang sidewalks, roads, common areas, or other lots, or create blind spots for drivers. Please tell me the fee, if any, and how to pay it. You can reach me at " + c.contact + "."
+        ];
+      } },
+    { id: "violation", group: "note", label: "Respond to a violation notice or fine", to: "Board of Directors", re: "Response to violation notice",
+      refs: "Sections 21.3 and 21.8", hint: "You usually have 7 days after written notice to fix a violation. Fines need 14 days' notice and a hearing.",
+      fields: [
+        { k: "ndate", l: "Date of the notice", t: "text", b: "date of notice" },
+        { k: "cites", l: "What does the notice say?", t: "area", b: "what the notice says" },
+        { k: "rtype", l: "Your response", t: "select", b: "response", o: ["I fixed the problem", "I disagree with the notice", "I need more time to fix it"] },
+        { k: "cure", l: "Date fixed, or date you will finish", t: "text", b: "date" },
+        { k: "resp", l: "Explain what happened or what you did", t: "area", b: "your explanation" }
+      ],
+      attach: ["Photos showing the current condition", "Receipts or other supporting documents"],
+      body: function (g, c, v) {
+        var t = (v.rtype || "I fixed the problem");
+        var p;
+        if (t === "I disagree with the notice") p = "I respectfully disagree with this notice. " + g("resp");
+        else if (t === "I need more time to fix it") p = "I am working to correct this issue and ask for additional time until " + g("cure") + ". I understand the Declaration allows seven days after written notice to cure (Section 21.3). " + g("resp");
+        else p = "I corrected the issue on " + g("cure") + ". " + g("resp") + " Please confirm in writing that the violation is closed.";
+        return [
+          "I am writing about the notice dated " + g("ndate") + " concerning my home at " + c.addr + ". The notice states: " + g("cites"),
+          p,
+          "Under Section 21.8, I understand fines require at least fourteen days' written notice and a hearing before the Violations Committee. If any fine or suspension is being considered, please send me written notice of the hearing date and time and the details of each alleged violation. I plan to attend, and I reserve my right to be represented by counsel, to cross-examine witnesses, and to receive the Committee's written decision within twenty-one days of the hearing. Please also send me a copy of any photos or other evidence supporting the notice."
+        ];
+      } },
+    { id: "docs", group: "note", label: "Request copies of the HOA documents", to: "Board of Directors", re: "Request for Association documents",
+      refs: "Section 19.1", hint: "Owners can request current copies of the Association Documents.",
+      fields: [], attach: [],
+      body: function (g, c) {
+        return [
+          "Under Section 19.1 of the Declaration, I am requesting current copies of the Association Documents for Penn Cove: the Declaration, Articles of Incorporation, By-Laws, and the current Rules and Regulations. I would also like the Architectural Control Committee's application form.",
+          "I would like to review them during normal business hours, or receive electronic copies at " + c.contact + "."
+        ];
+      } }
+  ];
+
+  var TBYID = {};
+  TEMPLATES.forEach(function (t) { TBYID[t.id] = t; });
+
+  var $tabFind = document.getElementById("tab-find");
+  var $tabWrite = document.getElementById("tab-write");
+  var $vFind = document.getElementById("view-find");
+  var $vWrite = document.getElementById("view-write");
+  var $wtype = document.getElementById("wtype");
+  var $whint = document.getElementById("whint");
+  var $wfields = document.getElementById("wfields");
+  var $wattachP = document.getElementById("wattach-panel");
+  var $wattach = document.getElementById("wattach");
+  var $wstatus = document.getElementById("wstatus");
+  var $wsubject = document.getElementById("wsubject");
+  var $wprev = document.getElementById("wpreview");
+  var $wmsg = document.getElementById("wmsg");
+  var $wcopy = document.getElementById("wcopy");
+  var $wcopysub = document.getElementById("wcopysub");
+  var $wshare = document.getElementById("wshare");
+  var $wmailto = document.getElementById("wmailto");
+  var $wmailtoShort = document.getElementById("wmailtoShort");
+  var $wme = document.getElementById("wme");
+
+  var view = "find";
+  var vals = {};      // per template: field values
+  var checks = {};    // per template: enclosure checkboxes
+  var me = {};
+  try { me = JSON.parse(window.localStorage.getItem("pc_me") || "{}") || {}; } catch (e) { me = {}; }
+  function saveMe() { try { window.localStorage.setItem("pc_me", JSON.stringify(me)); } catch (e) { /* not available */ } }
+
+  function today() {
+    try { return new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }); }
+    catch (e) { return "[date]"; }
+  }
+
+  function buildTypeSelect() {
+    var groups = [["acc", "Architectural approval (ACC)"], ["note", "Notices and requests"]];
+    var h = "";
+    groups.forEach(function (g) {
+      h += '<optgroup label="' + esc(g[1]) + '">';
+      TEMPLATES.forEach(function (t) { if (t.group === g[0]) h += '<option value="' + t.id + '">' + esc(t.label) + '</option>'; });
+      h += "</optgroup>";
+    });
+    $wtype.innerHTML = h;
+  }
+
+  function fieldHtml(f, v) {
+    var id = "wf-" + f.k, val = v[f.k] || "";
+    var h = '<label class="fl" for="' + id + '">' + esc(f.l) + '</label>';
+    if (f.t === "area") {
+      h += '<textarea id="' + id + '" data-k="' + f.k + '" rows="3" placeholder="' + esc(f.ex || "") + '">' + esc(val) + '</textarea>';
+    } else if (f.t === "select") {
+      h += '<select id="' + id + '" data-k="' + f.k + '"><option value="">Choose one</option>' +
+        f.o.map(function (o) { return '<option' + (val === o ? " selected" : "") + '>' + esc(o) + '</option>'; }).join("") + '</select>';
+    } else {
+      h += '<input id="' + id + '" data-k="' + f.k + '" type="text" autocomplete="off" placeholder="' + esc(f.ex || "") + '" value="' + esc(val) + '">';
+    }
+    return h;
+  }
+
+  function currentT() { return TBYID[$wtype.value] || TEMPLATES[0]; }
+
+  function buildFields() {
+    var T = currentT();
+    vals[T.id] = vals[T.id] || {};
+    $whint.textContent = T.hint + " (Declaration " + T.refs + ")";
+    $wfields.innerHTML = T.fields.length
+      ? T.fields.map(function (f) { return fieldHtml(f, vals[T.id]); }).join("")
+      : '<p class="hint">Nothing to fill in for this one. Add your details below.</p>';
+    if (T.attach && T.attach.length) {
+      if (!checks[T.id]) checks[T.id] = T.attach.map(function () { return true; });
+      $wattach.innerHTML = T.attach.map(function (a, i) {
+        return '<label class="check"><input type="checkbox" data-a="' + i + '"' + (checks[T.id][i] ? " checked" : "") + '><span>' + esc(a) + '</span></label>';
+      }).join("");
+      $wattachP.hidden = false;
+    } else { $wattachP.hidden = true; }
+    renderLetter();
+  }
+
+  function buildLetter() {
+    var T = currentT(), v = vals[T.id] || {};
+    var f = {};
+    T.fields.forEach(function (x) { f[x.k] = x; });
+    function g(k, optional) {
+      var s = (v[k] || "").trim();
+      if (s) return s;
+      return optional ? "" : "[" + (f[k] ? f[k].b : k) + "]";
+    }
+    var addr = (me.addr || "").trim() || "[your address]";
+    var contact = [(me.phone || "").trim(), (me.email || "").trim()].filter(Boolean).join(" | ") || "[your phone or email]";
+    var name = (me.name || "").trim() || "[your name]";
+    var sendto = (me.sendto || "").trim() || "[management company or HOA mailing address]";
+    var c = { addr: addr, contact: contact, name: name };
+
+    var paras;
+    if (T.group === "acc") {
+      var lines = ["Location: " + g("where"), "Materials, colors, and size: " + g("specs")];
+      if (T.power) lines.push("Power source: " + g("power"));
+      lines.push("Work performed by: " + g("who"), "Planned timing: " + g("when"));
+      paras = [
+        "I am the owner of the home at " + addr + " in Penn Cove. Under " + T.refs + " of the Declaration, I am requesting the Committee's prior written approval to " + T.what + ".",
+        "Project description:\n" + g("desc"),
+        lines.join("\n")
+      ].concat(T.extras).concat([
+        "I understand the Committee has 45 days after receiving everything it requires to approve or deny this request in writing, and I will provide any additional information within 15 days of a request (Section 20.8). I am responsible for obtaining all required permits (Section 20.11), and I will provide a security deposit if one is required (Section 20.21)."
+      ]);
+    } else {
+      paras = T.body(g, c, v);
+    }
+
+    var encl = [];
+    (T.attach || []).forEach(function (a, i) { if (checks[T.id] && checks[T.id][i]) encl.push("- " + a); });
+    if (encl.length) paras.push("Enclosed:\n" + encl.join("\n"));
+    paras.push(T.group === "acc"
+      ? "Please send your written decision to me at " + contact + ". Thank you for your time."
+      : "Thank you for your time.");
+
+    var text = [
+      today(),
+      "Penn Cove Homeowners Association, Inc.\nAttn: " + T.to + "\n" + sendto,
+      "Re: " + T.re + ", " + addr,
+      "Dear " + T.to + ",",
+      paras.join("\n\n"),
+      "Sincerely,\n" + name + "\n" + addr + "\n" + contact
+    ].join("\n\n");
+    return { text: text, subject: T.re + ", " + addr };
+  }
+
+  function renderLetter() {
+    var out = buildLetter();
+    var blanks = (out.text.match(/\[[^\]\n]+\]/g) || []).length;
+    $wprev.innerHTML = esc(out.text).replace(/\[[^\]\n]+\]/g, function (m) { return "<mark>" + m + "</mark>"; });
+    $wsubject.textContent = out.subject;
+    $wstatus.textContent = blanks
+      ? blanks + (blanks === 1 ? " blank" : " blanks") + " left to fill in (highlighted below)"
+      : "All filled in. Read it once, then copy it.";
+    $wmsg.textContent = "";
+    $wprev.dataset.plain = out.text;
+    $wcopysub.dataset.plain = out.subject;
+
+    var sendto = (me.sendto || "").trim();
+    var toEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sendto) ? sendto : "";
+    $wmailto.href = "mailto:" + encodeURIComponent(toEmail)
+      + "?subject=" + encodeURIComponent(out.subject)
+      + "&body=" + encodeURIComponent(out.text);
+    $wmailtoShort.href = "mailto:" + encodeURIComponent(toEmail)
+      + "?subject=" + encodeURIComponent(out.subject);
+  }
+
+  function copyPlain(text, done) {
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(ta); done(ok);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+    } else { fallback(); }
+  }
+
+  function setView(next, typeId) {
+    view = next;
+    var w = view === "write";
+    $tabFind.setAttribute("aria-selected", String(!w));
+    $tabWrite.setAttribute("aria-selected", String(w));
+    $vFind.hidden = w; $vWrite.hidden = !w;
+    if (w) {
+      if (typeId && TBYID[typeId]) $wtype.value = typeId;
+      buildFields();
+      $wme.open = !(me.name && me.addr);
+    }
+    try { window.scrollTo(0, 0); } catch (e) { /* ignore */ }
+    syncUrl();
+  }
+
+  buildTypeSelect();
+  ["name", "addr", "email", "phone", "sendto"].forEach(function (k) {
+    var el = document.getElementById("me-" + k);
+    if (el) el.value = me[k] || "";
+  });
+
+  $tabFind.addEventListener("click", function () { setView("find"); });
+  $tabWrite.addEventListener("click", function () { setView("write"); });
+  $wtype.addEventListener("change", function () { buildFields(); syncUrl(); });
+  $wfields.addEventListener("input", function (e) {
+    var k = e.target.getAttribute("data-k"); if (!k) return;
+    vals[currentT().id][k] = e.target.value; renderLetter();
+  });
+  $wfields.addEventListener("change", function (e) {
+    var k = e.target.getAttribute("data-k"); if (!k) return;
+    vals[currentT().id][k] = e.target.value; renderLetter();
+  });
+  $wattach.addEventListener("change", function (e) {
+    var i = e.target.getAttribute("data-a"); if (i === null) return;
+    checks[currentT().id][+i] = e.target.checked; renderLetter();
+  });
+  $wme.addEventListener("input", function (e) {
+    var id = e.target.id || ""; if (id.indexOf("me-") !== 0) return;
+    me[id.slice(3)] = e.target.value; saveMe(); renderLetter();
+  });
+  document.getElementById("wclearme").addEventListener("click", function () {
+    me = {}; saveMe();
+    ["name", "addr", "email", "phone", "sendto"].forEach(function (k) { document.getElementById("me-" + k).value = ""; });
+    renderLetter();
+  });
+  $wcopy.addEventListener("click", function () {
+    copyPlain($wprev.dataset.plain || "", function (ok) {
+      $wmsg.textContent = ok ? "Copied. Paste it into your email or document." : "Couldn't copy automatically. Press and hold the letter to select it, then copy.";
+    });
+  });
+  $wcopysub.addEventListener("click", function () {
+    copyPlain($wcopysub.dataset.plain || "", function (ok) {
+      $wmsg.textContent = ok ? "Subject line copied." : "Couldn't copy automatically. Select the subject line and copy it.";
+    });
+  });
+  if (navigator.share) {
+    $wshare.hidden = false;
+    $wshare.addEventListener("click", function () {
+      var p = navigator.share({ title: $wsubject.textContent, text: $wprev.dataset.plain || "" });
+      if (p && p.catch) p.catch(function () { /* cancelled */ });
+    });
+  }
+  $list.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-w]"); if (!b) return;
+    setView("write", b.getAttribute("data-w"));
+  });
+
+  /* ---------- start ---------- */
+  buildChips();
+  try {
+    var sp = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    var initial = sp.get("q");
+    if (initial) { $q.value = initial; state.q = initial.trim(); }
+    if (sp.get("view") === "write") setView("write", sp.get("type"));
+  } catch (e) { /* ignore */ }
+  render();
+})();
+</script>
+</body>
+</html>
